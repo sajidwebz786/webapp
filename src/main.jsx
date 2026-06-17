@@ -842,6 +842,7 @@ function TicketIcon() {
 
 function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
   if (!user) return <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={null} />;
+  const [selectedTicket, setSelectedTicket] = useState(null);
   const sorted = [...bookings].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const current = [sorted[0]].filter(Boolean);
   const previous = sorted.slice(1);
@@ -865,18 +866,63 @@ function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
         <article><Sparkles /><span>Total travel value</span><strong>₹{totalSpend.toLocaleString("en-IN")}</strong></article>
       </div>
       <div className="dashboard-grid">
-        <article className="dash-panel wide-panel"><h3>Current bookings</h3>{current.map((booking) => <BookingCard key={booking.id} booking={booking} onCancel={() => cancelBooking(booking)} />)}{!current.length && <p>No current bookings yet.</p>}</article>
-        <article className="dash-panel"><h3>Previous bookings</h3>{previous.map((booking) => <BookingCard key={booking.id} booking={booking} compact />)}{!previous.length && <p>No previous bookings yet.</p>}</article>
+        <article className="dash-panel wide-panel"><h3>Current bookings</h3>{current.map((booking) => <BookingCard key={booking.id} booking={booking} onCancel={() => cancelBooking(booking)} onViewTicket={() => setSelectedTicket(booking)} />)}{!current.length && <p>No current bookings yet.</p>}</article>
+        <article className="dash-panel"><h3>Previous bookings</h3>{previous.map((booking) => <BookingCard key={booking.id} booking={booking} compact onViewTicket={() => setSelectedTicket(booking)} />)}{!previous.length && <p>No previous bookings yet.</p>}</article>
         <article className="dash-panel"><h3>Quick actions</h3><button onClick={() => setPage("bus")}>Book bus</button><button onClick={() => setPage("flight")}>Book flight</button><button onClick={() => setPage("train")}>Book train</button><button onClick={() => setPage("support")}>Raise support request</button></article>
         <article className="dash-panel reward-panel wide-panel"><h3>TravelTimes Rewards</h3><strong>{rewardPoints.toLocaleString("en-IN")} points</strong><p>Earn points on every confirmed booking and redeem them for journey benefits when offers are enabled.</p><div><span>Upcoming trips</span><b>{upcoming}</b></div><div><span>Rail and air trips</span><b>{railAirTrips}</b></div></article>
       </div>
+      {selectedTicket && <TicketWindow booking={selectedTicket} onClose={() => setSelectedTicket(null)} />}
     </section>
   );
 }
 
-function BookingCard({ booking, onCancel, compact }) {
+function BookingCard({ booking, onCancel, compact, onViewTicket }) {
   const title = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "TravelTimes booking";
-  return <div className="booking-card"><div><b>{booking.bookingCode}</b><span>{booking.type} · {title}</span></div><div><small>{booking.travelDate}</small><strong>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</strong></div><div className="tracking-line">Live updates · {booking.status}</div>{!compact && <div className="booking-actions"><button>Modify</button><button onClick={onCancel}>Request cancellation</button><button>Re-book</button></div>}</div>;
+  return <div className="booking-card"><div><b>{booking.bookingCode}</b><span>{booking.type} · {title}</span></div><div><small>{booking.travelDate}</small><strong>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</strong></div><div className="tracking-line">Live updates · {booking.status}</div><div className="booking-actions"><button onClick={onViewTicket}>View ticket</button>{!compact && <><button>Modify</button><button onClick={onCancel}>Request cancellation</button><button>Re-book</button></>}</div></div>;
+}
+
+function TicketWindow({ booking, onClose }) {
+  const providerName = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "TravelTimes";
+  const from = booking.metadata?.origin || booking.TransportRoute?.origin || "-";
+  const to = booking.metadata?.destination || booking.TransportRoute?.destination || "-";
+  const seats = booking.selectedSeats?.length ? booking.selectedSeats : (booking.passengers || []).map((passenger) => passenger.seat).filter(Boolean);
+  return (
+    <div className="ticket-window-backdrop" role="dialog" aria-modal="true">
+      <article className="ticket-window">
+        <div className="ticket-window-head">
+          <div>
+            <span>TravelTimes e-ticket</span>
+            <h3>{booking.bookingCode}</h3>
+          </div>
+          <button className="ticket-window-close" onClick={onClose}>Close</button>
+        </div>
+        <div className="ticket-window-body">
+          <article className="print-ticket">
+            <div className="ticket-head"><Logo /><strong>{booking.bookingCode}</strong></div>
+            <h2>{providerName}</h2>
+            <p>{from} to {to} · {booking.travelDate}</p>
+            <div className="ticket-grid">
+              <span>Status<b>{booking.status}</b></span>
+              <span>Type<b>{booking.type}</b></span>
+              <span>Seats<b>{seats.length ? seats.join(", ") : "-"}</b></span>
+              <span>Amount<b>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</b></span>
+            </div>
+            <h3>Passengers</h3>
+            {(booking.passengers || []).map((passenger, index) => (
+              <div className="ticket-passenger" key={index}>
+                <span>{passenger.name || `Passenger ${index + 1}`}</span>
+                <span>{passenger.age || "-"} yrs</span>
+                <span>{passenger.gender || "-"}</span>
+                <b>{passenger.seat || seats[index] || "-"}</b>
+              </div>
+            ))}
+            {!(booking.passengers || []).length && <div className="ticket-passenger"><span>Passenger details not available</span><span>-</span><span>-</span><b>-</b></div>}
+            <p className="identity-note">Please carry a valid ID proof while boarding.</p>
+          </article>
+        </div>
+      </article>
+    </div>
+  );
 }
 
 function SupportPage({ user, bookings }) {

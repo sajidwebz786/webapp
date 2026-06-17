@@ -257,6 +257,13 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .tracking-line { color: var(--blue-dark); font-weight: 650; }
 .booking-actions { justify-content: flex-start !important; }
 .booking-actions button, .dash-panel button, .chat-actions button { border: 0; border-radius: 10px; padding: 9px 12px; background: #eef4ff; color: var(--blue-dark); font-weight: 650; }
+.ticket-window-backdrop { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 20px; background: rgba(5, 16, 38, .55); backdrop-filter: blur(8px); }
+.ticket-window { width: min(920px, 100%); max-height: min(90vh, 960px); overflow: hidden; border-radius: 18px; background: #f7f9fd; box-shadow: 0 24px 60px rgba(10, 25, 51, .35); display: grid; grid-template-rows: auto 1fr; }
+.ticket-window-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); background: white; }
+.ticket-window-head span { color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 800; }
+.ticket-window-head h3 { margin: 6px 0 0; font-size: 24px; }
+.ticket-window-close { border: 1px solid var(--line); border-radius: 999px; background: white; color: var(--ink); padding: 10px 14px; font-weight: 750; }
+.ticket-window-body { padding: 20px; overflow: auto; }
 .support-card { max-width: 760px; }
 .support-card textarea { min-height: 150px; resize: vertical; }
 .auth-card { width: min(520px, 100%); background: white; border-radius: 16px; padding: 20px; box-shadow: 0 18px 42px rgba(13, 41, 82, .12); display: grid; gap: 12px; }
@@ -369,4 +376,8 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
   .chat-launch { padding: 14px 18px; font-size: 16px; }
   .floating-chat { right: 14px; bottom: 14px; }
   .brand-logo { height: 40px; }
+  .ticket-window-backdrop { padding: 10px; }
+  .ticket-window-head { padding: 12px 14px; }
+  .ticket-window-head h3 { font-size: 20px; }
+  .ticket-window-body { padding: 12px; }
 }
