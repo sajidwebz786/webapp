@@ -221,6 +221,8 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   const [searching, setSearching] = useState(false);
   const resultsRef = useRef(null);
   const selectedCities = cities.filter((city) => query.scope === "international" ? city.isInternational : !city.isInternational);
+  const fromCities = selectedCities.filter((city) => city.name !== query.to);
+  const toCities = selectedCities.filter((city) => city.name !== query.from);
   const canSearch = query.from && query.to && query.from !== query.to && query.date && (type === "flight" ? true : query.scope === "domestic");
 
   const search = async (silent = false) => {
@@ -264,8 +266,8 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
         <label><input type="radio" checked={query.tripType === "round-trip"} onChange={() => setQuery({ ...query, tripType: "round-trip" })} /> Round trip</label>
       </div>
       <div className="main-search-row">
-        <label><span>{type === "bus" ? <Bus /> : type === "flight" ? <Plane /> : <Train />} From</span><select value={query.from} onChange={(e) => { setResults([]); setQuery({ ...query, from: e.target.value }); }}><option value="">Select from city</option>{selectedCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
-        <label><span><MapPin /> To</span><select value={query.to} onChange={(e) => { setResults([]); setQuery({ ...query, to: e.target.value }); }}><option value="">Select destination</option>{selectedCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
+        <label><span>{type === "bus" ? <Bus /> : type === "flight" ? <Plane /> : <Train />} From</span><select value={query.from} onChange={(e) => { const from = e.target.value; setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}><option value="">Select from city</option>{fromCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
+        <label><span><MapPin /> To</span><select value={query.to} onChange={(e) => { const to = e.target.value; setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}><option value="">Select destination</option>{toCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
         <label><span><CalendarDays /> Date of journey</span><input type="date" value={query.date} onChange={(e) => setQuery({ ...query, date: e.target.value })} /></label>
         {query.tripType === "round-trip" && <label><span><CalendarDays /> Return</span><input type="date" value={query.returnDate} onChange={(e) => setQuery({ ...query, returnDate: e.target.value })} /></label>}
         <label><span><UserRound /> Travellers</span><input type="number" min="1" max="6" value={query.travellers} onChange={(e) => setQuery({ ...query, travellers: Number(e.target.value) })} /></label>
