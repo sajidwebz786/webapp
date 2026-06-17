@@ -43,6 +43,40 @@ function operatorBrand(routeOrName) {
   return operatorBrands.find((brand) => value.toLowerCase().includes(brand.match));
 }
 
+const cancellationPolicyRows = [
+  ["More than 24 hours before departure", "90% refund"],
+  ["12 to 24 hours before departure", "75% refund"],
+  ["6 to 12 hours before departure", "50% refund"],
+  ["Less than 6 hours before departure", "25% refund"],
+  ["No-show or missed boarding", "No refund"]
+];
+
+function formatRouteTime(dateValue, offsetMinutes = 0) {
+  const date = new Date(dateValue);
+  date.setMinutes(date.getMinutes() + offsetMinutes);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function routeBoardingPoints(route) {
+  const departure = route.departureTime;
+  return [
+    { time: formatRouteTime(departure, -30), name: `${route.origin} Central Bus Stand`, note: "Main boarding hub with waiting lounge and enquiry counter." },
+    { time: formatRouteTime(departure, -20), name: `${route.origin} Railway Station Pickup`, note: "Pickup near the station entrance. Look for the operator signboard." },
+    { time: formatRouteTime(departure, -12), name: `${route.origin} City Circle`, note: "Convenient city-centre stop for local passengers." },
+    { time: formatRouteTime(departure, -5), name: `${route.origin} Highway Junction`, note: "Last boarding point before the service leaves the city." }
+  ];
+}
+
+function routeDroppingPoints(route) {
+  const arrival = route.arrivalTime;
+  return [
+    { time: formatRouteTime(arrival, -18), name: `${route.destination} Outer Ring Road`, note: "Early drop for passengers heading to suburban areas." },
+    { time: formatRouteTime(arrival, -10), name: `${route.destination} IT Park / Industrial Area`, note: "Drop near major office and industrial clusters." },
+    { time: formatRouteTime(arrival, -4), name: `${route.destination} Main Market`, note: "Central drop close to shopping and local transport." },
+    { time: formatRouteTime(arrival, 0), name: `${route.destination} Central Bus Terminal`, note: "Final stop with taxi, auto and metro connectivity." }
+  ];
+}
+
 function App() {
   const [page, setPage] = useState("bus");
   const [user, setUser] = useState(null);
@@ -418,8 +452,96 @@ function Deck({ title, seats, unavailable, selected, toggle, sleeper, mixed, bas
   );
 }
 
+function RouteInfoTabs({ route }) {
+  const [activeTab, setActiveTab] = useState("highlights");
+  const tabs = [
+    ["highlights", "Highlights"],
+    ["cancellation", "Cancellation policy"],
+    ["boarding", "Boarding point"],
+    ["dropping", "Dropping point"]
+  ];
+  const boardingPoints = routeBoardingPoints(route);
+  const droppingPoints = routeDroppingPoints(route);
+
+  return (
+    <>
+      <div className="detail-tabs">
+        {tabs.map(([key, label]) => (
+          <button key={key} type="button" className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)}>{label}</button>
+        ))}
+      </div>
+      {activeTab === "highlights" && (
+        <div className="highlight-grid">
+          <div><b>Top Comfort</b><p>Premium seating, clean cabin and regular maintenance checks.</p></div>
+          <div><b>Bus Safety</b><p>GPS-enabled fleet with route assistance and emergency support.</p></div>
+          <div><b>Highly On Time</b><p>Consistent departure performance on this route.</p></div>
+          <div><b>Women Care</b><p>Priority assistance and dedicated support for women travellers.</p></div>
+        </div>
+      )}
+      {activeTab === "cancellation" && (
+        <div className="detail-tab-panel">
+          <h3>Cancellation and refund policy</h3>
+          <p className="detail-copy">Cancellations are processed as per operator rules. Refund amounts are calculated on the base fare after deducting applicable service charges.</p>
+          <table>
+            <tbody>
+              <tr><th>Cancellation window</th><th>Refund</th></tr>
+              {cancellationPolicyRows.map(([window, refund]) => <tr key={window}><td>{window}</td><td>{refund}</td></tr>)}
+            </tbody>
+          </table>
+          <ul className="detail-list">
+            <li>Convenience fee and payment gateway charges are non-refundable.</li>
+            <li>Approved refunds are credited within 5–7 working days to the original payment method.</li>
+            <li>One free date change may be allowed up to 12 hours before departure on selected services.</li>
+            <li>If the operator cancels the service, you receive a full refund or free reschedule.</li>
+          </ul>
+        </div>
+      )}
+      {activeTab === "boarding" && (
+        <div className="detail-tab-panel">
+          <h3>Boarding points</h3>
+          <p className="detail-copy">Please reach your selected boarding point at least 15 minutes before the scheduled pickup time. Carry a valid government-issued photo ID and your booking confirmation.</p>
+          <div className="route-point-list">
+            {boardingPoints.map((point) => (
+              <article key={point.name} className="route-point-item">
+                <b>{point.time}</b>
+                <div><strong>{point.name}</strong><p>{point.note}</p></div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+      {activeTab === "dropping" && (
+        <div className="detail-tab-panel">
+          <h3>Dropping points</h3>
+          <p className="detail-copy">Dropping times are approximate and may vary based on traffic, weather and route conditions on the day of travel.</p>
+          <div className="route-point-list">
+            {droppingPoints.map((point) => (
+              <article key={point.name} className="route-point-item">
+                <b>{point.time}</b>
+                <div><strong>{point.name}</strong><p>{point.note}</p></div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function BusProfilePanel({ route }) {
-  return <article className="bus-profile-panel"><div className="bus-profile-head"><div><b>{route.providerName}</b><p>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p></div><strong>★ {route.rating || 4.4}</strong></div><div className="bus-gallery"><img src="https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=700&q=80" alt="Bus front" /><img src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=700&q=80" alt="Bus journey" /></div><div className="detail-tabs"><span className="active">Highlights</span><span>Cancellation policy</span><span>Boarding point</span><span>Dropping point</span></div><div className="highlight-grid"><div><b>Top Comfort</b><p>Premium seating and clean cabin</p></div><div><b>Bus Safety</b><p>Tracked route assistance</p></div><div><b>Highly On Time</b><p>Consistent recent trips</p></div><div><b>Women Care</b><p>Priority support</p></div></div><h3>Cancellation policy</h3><table><tbody><tr><th>Time window</th><th>Refund</th></tr><tr><td>Before journey day</td><td>90%</td></tr><tr><td>On journey day</td><td>70%</td></tr></tbody></table></article>;
+  return (
+    <article className="bus-profile-panel">
+      <div className="bus-profile-head">
+        <div><b>{route.providerName}</b><p>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p></div>
+        <strong>★ {route.rating || 4.4}</strong>
+      </div>
+      <div className="bus-gallery">
+        <img src="https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=700&q=80" alt="Bus front" />
+        <img src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=700&q=80" alt="Bus journey" />
+      </div>
+      <RouteInfoTabs route={route} />
+    </article>
+  );
 }
 
 function BookingModal({ route, query, user, message, onClose, onBuy }) {
@@ -474,7 +596,21 @@ function PointList({ title, subtitle, points, selected, setSelected, start }) {
 }
 
 function SeatDetailsStep({ route, selectedSeats, setSelectedSeats }) {
-  return <div className="seat-info-layout"><div><SeatMap route={route} selected={selectedSeats} setSelected={setSelectedSeats} /><div className="seat-legend"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="sold-seat">Sold</span></div></div><article className="bus-detail-panel"><div className="detail-top"><div><b>{route.providerName}</b><p>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p></div><strong>★ {route.rating || 4.3}</strong></div><div className="detail-tabs"><span className="active">Highlights</span><span>Cancellation policy</span><span>Boarding point</span><span>Dropping point</span></div><div className="highlight-grid"><div><b>Highly On Time</b><p>Consistent recent trips</p></div><div><b>Bus Safety</b><p>Available</p></div><div><b>Top Comfort</b><p>Premium seating</p></div></div><h3>Cancellation policy</h3><table><tbody><tr><th>Time window</th><th>Refund</th></tr><tr><td>Before journey day</td><td>90%</td></tr><tr><td>On journey day</td><td>70%</td></tr></tbody></table></article></div>;
+  return (
+    <div className="seat-info-layout">
+      <div>
+        <SeatMap route={route} selected={selectedSeats} setSelected={setSelectedSeats} />
+        <div className="seat-legend"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="sold-seat">Sold</span></div>
+      </div>
+      <article className="bus-detail-panel">
+        <div className="detail-top">
+          <div><b>{route.providerName}</b><p>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p></div>
+          <strong>★ {route.rating || 4.3}</strong>
+        </div>
+        <RouteInfoTabs route={route} />
+      </article>
+    </div>
+  );
 }
 
 function FareSummary({ total, route, boardingPoint, dropPoint, seats }) {
@@ -960,7 +1096,31 @@ function FloatingAssistant({ user, bookings }) {
 }
 
 function Footer({ setPage }) {
-  return <footer className="site-footer"><Logo /><div><button onClick={() => setPage("packages")}>Tour Packages</button><button onClick={() => setPage("hotels")}>Hotels</button><button onClick={() => setPage("support")}>Contact Us</button><button>About Us</button><button>Services</button></div><span className="footer-note">Comfortable journeys, handpicked stays and memorable holidays.</span></footer>;
+  return (
+    <footer className="site-footer">
+      <Logo />
+      <div className="footer-links">
+        <button onClick={() => setPage("packages")}>Tour Packages</button>
+        <button onClick={() => setPage("hotels")}>Hotels</button>
+        <button onClick={() => setPage("support")}>Contact Us</button>
+        <button>About Us</button>
+        <button>Services</button>
+      </div>
+      <div className="footer-policy">
+        <h4>Cancellation policy</h4>
+        <p>TravelTimes follows standard operator cancellation rules to keep refunds fair and transparent for every booking.</p>
+        <ul>
+          <li>Cancel more than 24 hours before departure to receive up to 90% of the base fare.</li>
+          <li>Partial refunds apply for cancellations made between 6 and 24 hours before departure.</li>
+          <li>No refund is provided for no-shows or cancellations within 6 hours of departure.</li>
+          <li>Convenience and payment gateway charges are non-refundable.</li>
+          <li>Approved refunds are processed within 5–7 working days to the original payment method.</li>
+          <li>Operator cancellations qualify for a full refund or free rescheduling.</li>
+        </ul>
+      </div>
+      <span className="footer-note">Comfortable journeys, handpicked stays and memorable holidays.</span>
+    </footer>
+  );
 }
 
 createRoot(document.getElementById("root")).render(<App />);
