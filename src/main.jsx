@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Armchair, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, Gift, Headphones, Hotel, LogOut, MapPin, MessageSquare, Plane, Search, ShieldCheck, Sparkles, Train, UserRound } from "lucide-react";
+import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
 import { api, tokenStore } from "./services/api";
 import { Logo } from "./components/Logo";
 import apsrtcLogo from "./assets/images/apsrtc-logo.png";
@@ -50,6 +50,34 @@ const cancellationPolicyRows = [
   ["Less than 6 hours before departure", "25% refund"],
   ["No-show or missed boarding", "No refund"]
 ];
+
+const footerRouteTabs = {
+  routes: {
+    label: "Top Bus Routes",
+    links: ["Hyderabad to Bangalore Bus", "Bangalore to Chennai Bus", "Mumbai to Pune Bus", "Delhi to Jaipur Bus", "Chennai to Coimbatore Bus", "Hyderabad to Vijayawada Bus", "Bangalore to Goa Bus", "Pune to Mumbai Bus", "Kolkata to Bhubaneswar Bus", "Ahmedabad to Surat Bus", "Indore to Bhopal Bus", "Kochi to Trivandrum Bus"]
+  },
+  cities: {
+    label: "Buses From Top Cities",
+    links: ["Buses from Hyderabad", "Buses from Bangalore", "Buses from Chennai", "Buses from Mumbai", "Buses from Delhi", "Buses from Pune", "Buses from Kolkata", "Buses from Ahmedabad", "Buses from Jaipur", "Buses from Kochi", "Buses from Lucknow", "Buses from Chandigarh"]
+  },
+  rtc: {
+    label: "Top RTC Buses",
+    links: ["APSRTC Buses", "KSRTC Buses", "TGSRTC Buses", "MSRTC Buses", "GSRTC Buses", "UPSRTC Buses", "RSRTC Buses", "OSRTC Buses", "Kerala RTC Buses", "TNSTC Buses", "WBTC Buses", "HRTC Buses"]
+  },
+  services: {
+    label: "Top Bus Services",
+    links: ["Orange Travels", "SRS Travels", "VRL Travels", "KPN Travels", "Jabbar Travels", "Kallada Travels", "Parveen Travels", "Neeta Travels", "Sharma Travels", "IntrCity SmartBus", "Zingbus", "RedBus Express"]
+  },
+  quick: {
+    label: "Quick Links",
+    links: ["Bus Offers", "Track Ticket", "Cancel Ticket", "Reschedule Ticket", "Bus Timetable", "Live Bus Tracking", "Women Traveller Care", "Group Booking", "Corporate Travel", "Travel Insurance", "Customer Support", "Download App"]
+  }
+};
+
+function formatDisplayDate(dateValue) {
+  const date = new Date(`${dateValue}T00:00:00`);
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 
 function formatRouteTime(dateValue, offsetMinutes = 0) {
   const date = new Date(dateValue);
@@ -224,6 +252,7 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   const fromCities = selectedCities.filter((city) => city.name !== query.to);
   const toCities = selectedCities.filter((city) => city.name !== query.from);
   const canSearch = query.from && query.to && query.from !== query.to && query.date && (type === "flight" ? true : query.scope === "domestic");
+  const isBus = type === "bus";
 
   const search = async (silent = false) => {
     if (!canSearch) {
@@ -245,6 +274,16 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
     }
   };
 
+  const swapCities = () => {
+    if (!query.from && !query.to) return;
+    setResults([]);
+    setQuery({ ...query, from: query.to, to: query.from });
+  };
+
+  const setQuickDate = (days) => {
+    setQuery({ ...query, date: toDateInputValue(daysFromNow(days)) });
+  };
+
   useEffect(() => {
     if (type !== "flight" && query.scope !== "domestic") {
       setQuery({ ...query, scope: "domestic", from: "", to: "" });
@@ -254,32 +293,70 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   }, [type, query.scope]);
 
   return (
-    <div className={`journey-module ${compactHero ? "hero-search" : ""}`}>
-      <div className="radio-row">
-        {type === "flight" && (
-          <>
-            <label><input type="radio" checked={query.scope === "domestic"} onChange={() => setQuery({ ...query, scope: "domestic", from: "", to: "" })} /> Domestic</label>
-            <label><input type="radio" checked={query.scope === "international"} onChange={() => setQuery({ ...query, scope: "international", from: "", to: "" })} /> International</label>
-          </>
-        )}
-        <label><input type="radio" checked={query.tripType === "one-way"} onChange={() => setQuery({ ...query, tripType: "one-way" })} /> One way</label>
-        <label><input type="radio" checked={query.tripType === "round-trip"} onChange={() => setQuery({ ...query, tripType: "round-trip" })} /> Round trip</label>
-      </div>
-      <div className="main-search-row">
-        <label><span>{type === "bus" ? <Bus /> : type === "flight" ? <Plane /> : <Train />} From</span><select value={query.from} onChange={(e) => { const from = e.target.value; setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}><option value="">Select from city</option>{fromCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
-        <label><span><MapPin /> To</span><select value={query.to} onChange={(e) => { const to = e.target.value; setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}><option value="">Select destination</option>{toCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
-        <label><span><CalendarDays /> Date of journey</span><input type="date" value={query.date} onChange={(e) => setQuery({ ...query, date: e.target.value })} /></label>
-        {query.tripType === "round-trip" && <label><span><CalendarDays /> Return</span><input type="date" value={query.returnDate} onChange={(e) => setQuery({ ...query, returnDate: e.target.value })} /></label>}
-        <label><span><UserRound /> Travellers</span><input type="number" min="1" max="6" value={query.travellers} onChange={(e) => setQuery({ ...query, travellers: Number(e.target.value) })} /></label>
-      </div>
-      <button className={`search-pill ${searching ? "is-loading" : ""}`} onClick={() => search(false)} disabled={searching || !canSearch}>
-        <Search size={22} /> {searching ? "Finding best options..." : `Search ${type === "bus" ? "buses" : type === "flight" ? "flights" : "trains"}`}
-      </button>
+    <div className={`journey-module ${compactHero ? "hero-search" : ""} ${isBus ? "bus-search-module" : ""}`}>
+      {!isBus && (
+        <div className="radio-row">
+          {type === "flight" && (
+            <>
+              <label><input type="radio" checked={query.scope === "domestic"} onChange={() => setQuery({ ...query, scope: "domestic", from: "", to: "" })} /> Domestic</label>
+              <label><input type="radio" checked={query.scope === "international"} onChange={() => setQuery({ ...query, scope: "international", from: "", to: "" })} /> International</label>
+            </>
+          )}
+          <label><input type="radio" checked={query.tripType === "one-way"} onChange={() => setQuery({ ...query, tripType: "one-way" })} /> One way</label>
+          <label><input type="radio" checked={query.tripType === "round-trip"} onChange={() => setQuery({ ...query, tripType: "round-trip" })} /> Round trip</label>
+        </div>
+      )}
+
+      {isBus ? (
+        <div className="abhi-search-bar">
+          <label className="abhi-field">
+            <span className="abhi-label"><MapPin size={18} /> Source</span>
+            <select value={query.from} onChange={(e) => { const from = e.target.value; setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}>
+              <option value="">Select city</option>
+              {fromCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}
+            </select>
+          </label>
+          <button type="button" className="swap-btn" onClick={swapCities} aria-label="Swap source and destination"><ArrowDownUp size={18} /></button>
+          <label className="abhi-field">
+            <span className="abhi-label"><MapPin size={18} /> Destination</span>
+            <select value={query.to} onChange={(e) => { const to = e.target.value; setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}>
+              <option value="">Select city</option>
+              {toCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}
+            </select>
+          </label>
+          <label className="abhi-field abhi-date" onClick={(e) => e.currentTarget.querySelector('input[type="date"]')?.showPicker?.()}>
+            <span className="abhi-label"><CalendarDays size={18} /> Departure</span>
+            <span className="abhi-date-display">{formatDisplayDate(query.date)}</span>
+            <input type="date" value={query.date} min={toDateInputValue(daysFromNow(0))} onChange={(e) => setQuery({ ...query, date: e.target.value })} tabIndex={-1} />
+          </label>
+          <div className="quick-date-btns">
+            <button type="button" className={query.date === toDateInputValue(daysFromNow(0)) ? "active" : ""} onClick={() => setQuickDate(0)}>Today</button>
+            <button type="button" className={query.date === toDateInputValue(daysFromNow(1)) ? "active" : ""} onClick={() => setQuickDate(1)}>Tomorrow</button>
+          </div>
+          <button type="button" className={`abhi-search-btn ${searching ? "is-loading" : ""}`} onClick={() => search(false)} disabled={searching || !canSearch}>
+            Search <ChevronRight size={20} />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="main-search-row">
+            <label><span>{type === "flight" ? <Plane /> : <Train />} From</span><select value={query.from} onChange={(e) => { const from = e.target.value; setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}><option value="">Select from city</option>{fromCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
+            <label><span><MapPin /> To</span><select value={query.to} onChange={(e) => { const to = e.target.value; setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}><option value="">Select destination</option>{toCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
+            <label><span><CalendarDays /> Date of journey</span><input type="date" value={query.date} onChange={(e) => setQuery({ ...query, date: e.target.value })} /></label>
+            {query.tripType === "round-trip" && <label><span><CalendarDays /> Return</span><input type="date" value={query.returnDate} onChange={(e) => setQuery({ ...query, returnDate: e.target.value })} /></label>}
+            <label><span><UserRound /> Travellers</span><input type="number" min="1" max="6" value={query.travellers} onChange={(e) => setQuery({ ...query, travellers: Number(e.target.value) })} /></label>
+          </div>
+          <button className={`search-pill ${searching ? "is-loading" : ""}`} onClick={() => search(false)} disabled={searching || !canSearch}>
+            <Search size={22} /> {searching ? "Finding best options..." : `Search ${type === "flight" ? "flights" : "trains"}`}
+          </button>
+        </>
+      )}
+
       {query.scope === "international" && <p className="soft-note">International destinations will be enabled in the next expansion.</p>}
       {searching && <div className="search-feedback">Checking timings, fares and available seats for your route.</div>}
       {message && <div className="search-feedback">{message}</div>}
       <div ref={resultsRef}>
-      <JourneyResults type={type} results={results} onViewSeats={(route) => { setActiveJourney({ route, query, type }); setPage("booking"); }} />
+        <JourneyResults type={type} results={results} query={query} onViewSeats={(route) => { setActiveJourney({ route, query, type }); setPage("booking"); }} />
       </div>
     </div>
   );
@@ -619,88 +696,241 @@ function FareSummary({ total, route, boardingPoint, dropPoint, seats }) {
   return <div className="fare-summary"><h3>Fare summary</h3><div><span>Base fare</span><b>₹{Number(route.price).toLocaleString("en-IN")} × {seats.length}</b></div><div><span>Seats</span><b>{seats.join(", ")}</b></div><div><span>Boarding</span><b>{boardingPoint || "Select point"}</b></div><div><span>Dropping</span><b>{dropPoint || "Select point"}</b></div><div className="fare-total"><span>Amount to pay</span><strong>₹{Number(total).toLocaleString("en-IN")}</strong></div></div>;
 }
 
-function JourneyResults({ type, results, onViewSeats }) {
+function JourneyResults({ type, results, query, onViewSeats }) {
   const [filters, setFilters] = useState([]);
   const [activeOperator, setActiveOperator] = useState("private");
-  const [timing, setTiming] = useState("any");
+  const [departureSlot, setDepartureSlot] = useState("any");
+  const [sortBy, setSortBy] = useState("price");
+  const [popularTab, setPopularTab] = useState("boarding");
+  const [selectedPoint, setSelectedPoint] = useState("");
+  const [busPartner, setBusPartner] = useState("");
+  const routeMinPrice = Math.min(...results.map((route) => Number(route.price || 0)), 0);
   const routeMaxPrice = Math.max(...results.map((route) => Number(route.price || 0)), 0);
+  const [minPrice, setMinPrice] = useState(routeMinPrice);
   const [maxPrice, setMaxPrice] = useState(routeMaxPrice);
   const stateTabs = type === "bus" ? operatorBrands.filter((brand) => results.some((route) => operatorBrand(route)?.key === brand.key)) : [];
 
   useEffect(() => {
+    setMinPrice(routeMinPrice);
     setMaxPrice(routeMaxPrice);
     setActiveOperator("private");
-    setTiming("any");
+    setDepartureSlot("any");
+    setSortBy("price");
+    setSelectedPoint("");
+    setBusPartner("");
     setFilters([]);
-  }, [type, routeMaxPrice, results.length]);
+  }, [type, routeMinPrice, routeMaxPrice, results.length]);
 
   if (!results.length) return null;
 
   const filterOptions = [
-    { key: "rated", label: "Highly rated", test: (route) => Number(route.rating || 0) >= 4.4 },
-    { key: "free", label: "Free cancellation", test: (route) => String(route.cancellationPolicy || "").toLowerCase().includes("free") || route.amenities?.includes("Free date change") },
-    { key: "tracking", label: "Live tracking", test: (route) => route.amenities?.some((item) => item.toLowerCase().includes("tracking")) },
-    { key: "ac", label: "AC", test: (route) => `${route.classType} ${route.vehicleType}`.toLowerCase().includes("ac") && !`${route.classType}`.toLowerCase().includes("non ac") },
-    { key: "nonac", label: "Non-AC", test: (route) => `${route.classType} ${route.vehicleType}`.toLowerCase().includes("non ac") },
-    { key: "sleeper", label: "Sleeper / semi sleeper", test: (route) => `${route.classType} ${route.vehicleType} ${route.seatLayout?.type}`.toLowerCase().includes("sleeper") }
+    { key: "rated", label: "Highly rated", icon: Star, test: (route) => Number(route.rating || 0) >= 4.4 },
+    { key: "free", label: "Free cancellation", icon: ShieldCheck, test: (route) => String(route.cancellationPolicy || "").toLowerCase().includes("free") || route.amenities?.includes("Free date change") },
+    { key: "tracking", label: "Live tracking", icon: MapPinned, test: (route) => route.amenities?.some((item) => item.toLowerCase().includes("tracking")) },
+    { key: "ac", label: "AC", icon: Snowflake, test: (route) => `${route.classType} ${route.vehicleType}`.toLowerCase().includes("ac") && !`${route.classType}`.toLowerCase().includes("non ac") },
+    { key: "nonac", label: "Non-AC", icon: ThermometerSnowflake, test: (route) => `${route.classType} ${route.vehicleType}`.toLowerCase().includes("non ac") },
+    { key: "sleeper", label: "Sleeper", icon: BedDouble, test: (route) => `${route.classType} ${route.vehicleType} ${route.seatLayout?.type}`.toLowerCase().includes("sleeper") },
+    { key: "seater", label: "Seater", icon: Armchair, test: (route) => !`${route.classType} ${route.vehicleType} ${route.seatLayout?.type}`.toLowerCase().includes("sleeper") },
+    { key: "newbus", label: "New buses", icon: Bus, test: (route) => Number(route.rating || 0) >= 4.5 },
+    { key: "offers", label: "Offers", icon: Percent, test: (route) => route.amenities?.some((item) => /off|discount|save/i.test(item)) || String(route.cancellationPolicy || "").toLowerCase().includes("free") }
   ];
 
-  const timingTest = (route) => {
-    const hour = new Date(route.departureTime).getHours();
-    if (timing === "early") return hour < 10;
-    if (timing === "day") return hour >= 10 && hour < 17;
-    if (timing === "night") return hour >= 17;
-    return true;
+  const busTypeFilters = filterOptions.filter((item) => ["ac", "sleeper", "seater", "nonac", "tracking", "newbus", "offers"].includes(item.key));
+
+  const departureSlots = [
+    { key: "before10", label: "Before 10 AM", icon: Sunrise, test: (route) => new Date(route.departureTime).getHours() < 10 },
+    { key: "day", label: "10 AM – 5 PM", icon: Sun, test: (route) => { const hour = new Date(route.departureTime).getHours(); return hour >= 10 && hour < 17; } },
+    { key: "evening", label: "5 PM – 11 PM", icon: Sunset, test: (route) => { const hour = new Date(route.departureTime).getHours(); return hour >= 17 && hour < 23; } },
+    { key: "night", label: "After 11 PM", icon: Moon, test: (route) => new Date(route.departureTime).getHours() >= 23 }
+  ];
+
+  const availableSeats = (route) => {
+    const seats = route.seatLayout?.seats || [];
+    const unavailable = new Set(route.seatLayout?.unavailable || []);
+    return seats.filter((seat) => !seat.isWalkway && !unavailable.has(seat.id)).length;
   };
+
+  const boardingPoints = [...new Set(results.flatMap((route) => routeBoardingPoints(route).map((point) => point.name.split(" ")[0])))].slice(0, 8);
+  const droppingPoints = [...new Set(results.flatMap((route) => routeDroppingPoints(route).map((point) => point.name.split(" ")[0])))].slice(0, 8);
+  const operators = [...new Set(results.map((route) => route.providerName))].slice(0, 8);
 
   const operatorFiltered = type === "bus" && stateTabs.length
     ? results.filter((route) => activeOperator === "private" ? !operatorBrand(route) : operatorBrand(route)?.key === activeOperator)
     : results;
+
   const filtered = operatorFiltered
-    .filter((route) => Number(route.price) <= maxPrice)
-    .filter(timingTest)
+    .filter((route) => Number(route.price) >= minPrice && Number(route.price) <= maxPrice)
+    .filter((route) => departureSlot === "any" || departureSlots.find((slot) => slot.key === departureSlot)?.test(route))
+    .filter((route) => !busPartner || route.providerName === busPartner)
+    .filter((route) => !selectedPoint || routeBoardingPoints(route).some((point) => point.name.includes(selectedPoint)) || routeDroppingPoints(route).some((point) => point.name.includes(selectedPoint)) || route.providerName.includes(selectedPoint))
     .filter((route) => filters.every((key) => filterOptions.find((item) => item.key === key)?.test(route)))
-    .sort((a, b) => timing === "early" ? new Date(a.departureTime) - new Date(b.departureTime) : Number(a.price) - Number(b.price));
+    .sort((a, b) => {
+      if (sortBy === "price") return Number(a.price) - Number(b.price);
+      if (sortBy === "seats") return availableSeats(b) - availableSeats(a);
+      if (sortBy === "rating") return Number(b.rating || 0) - Number(a.rating || 0);
+      if (sortBy === "arrival") return new Date(a.arrivalTime) - new Date(b.arrivalTime);
+      if (sortBy === "departure") return new Date(a.departureTime) - new Date(b.departureTime);
+      return 0;
+    });
+
   const toggleFilter = (key) => setFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  const clearFilters = () => { setFilters([]); setDepartureSlot("any"); setMinPrice(routeMinPrice); setMaxPrice(routeMaxPrice); setBusPartner(""); setSelectedPoint(""); };
+
+  const sortOptions = [
+    ["price", "Price"],
+    ["seats", "Seats"],
+    ["rating", "Ratings"],
+    ["arrival", "Arrival Time"],
+    ["departure", "Departure Time"]
+  ];
+
+  const offerCards = [
+    { title: "Flash Offer", tone: "flash", icon: Tag },
+    { title: "Advance Booking", tone: "advance", icon: CalendarDays },
+    { title: "Price Drop", tone: "drop", icon: Percent }
+  ];
 
   return (
     <section className="journey-results">
       <aside className="filter-panel">
-        <h3>Filter {type === "bus" ? "buses" : type === "flight" ? "flights" : "trains"}</h3>
-        {filterOptions.map((item) => <button key={item.key} className={filters.includes(item.key) ? "active" : ""} onClick={() => toggleFilter(item.key)}>{item.label}</button>)}
-        <div className="range-filter">
-          <span>Price up to</span>
-          <strong>₹{Number(maxPrice || 0).toLocaleString("en-IN")}</strong>
-          <input type="range" min="0" max={routeMaxPrice || 0} step="50" value={maxPrice || 0} onChange={(event) => setMaxPrice(Number(event.target.value))} />
+        <div className="filter-head">
+          <h3>Filters</h3>
+          <button type="button" className="clear-filters" onClick={clearFilters}>Clear All</button>
         </div>
-        <div className="timing-filter">
-          <span>Timing preference</span>
-          {[
-            ["any", "Any time"],
-            ["early", "Earliest"],
-            ["day", "Day"],
-            ["night", "Evening / night"]
-          ].map(([key, label]) => <button key={key} className={timing === key ? "active" : ""} onClick={() => setTiming(key)}>{label}</button>)}
+
+        {type === "bus" && (
+          <div className="bus-type-grid">
+            <span className="filter-section-label">Bus Type</span>
+            <div className="type-icon-grid">
+              {busTypeFilters.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button key={item.key} type="button" className={`type-icon-btn ${filters.includes(item.key) ? "active" : ""}`} onClick={() => toggleFilter(item.key)}>
+                    <Icon size={20} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="range-filter dual-range">
+          <span className="filter-section-label">Price Range</span>
+          <div className="price-range-labels">
+            <strong>₹{Number(minPrice).toLocaleString("en-IN")}</strong>
+            <strong>₹{Number(maxPrice).toLocaleString("en-IN")}</strong>
+          </div>
+          <input type="range" min={routeMinPrice} max={routeMaxPrice} step="50" value={minPrice} onChange={(event) => setMinPrice(Math.min(Number(event.target.value), maxPrice))} />
+          <input type="range" min={routeMinPrice} max={routeMaxPrice} step="50" value={maxPrice} onChange={(event) => setMaxPrice(Math.max(Number(event.target.value), minPrice))} />
+        </div>
+
+        <div className="departure-time-grid">
+          <span className="filter-section-label">Departure Time</span>
+          <div className="time-slot-grid">
+            {departureSlots.map((slot) => {
+              const Icon = slot.icon;
+              return (
+                <button key={slot.key} type="button" className={`time-slot-btn ${departureSlot === slot.key ? "active" : ""}`} onClick={() => setDepartureSlot(departureSlot === slot.key ? "any" : slot.key)}>
+                  <Icon size={18} />
+                  <span>{slot.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {type === "bus" && (
+          <div className="partner-filter">
+            <span className="filter-section-label">Bus Partner</span>
+            <select value={busPartner} onChange={(event) => setBusPartner(event.target.value)}>
+              <option value="">All operators</option>
+              {operators.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div className="extra-filters">
+          <span className="filter-section-label">More Filters</span>
+          {filterOptions.filter((item) => !busTypeFilters.find((busItem) => busItem.key === item.key)).map((item) => {
+            const Icon = item.icon;
+            return (
+              <button key={item.key} type="button" className={filters.includes(item.key) ? "active" : ""} onClick={() => toggleFilter(item.key)}>
+                <Icon size={16} /> {item.label}
+              </button>
+            );
+          })}
         </div>
       </aside>
+
       <div className="result-main">
+        {type === "bus" && (
+          <div className="offers-carousel">
+            {offerCards.map((offer) => {
+              const Icon = offer.icon;
+              return (
+                <article key={offer.title} className={`offer-chip ${offer.tone}`}>
+                  <Icon size={20} />
+                  <span>{offer.title}</span>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="sort-bar">
+          {sortOptions.map(([key, label]) => (
+            <button key={key} type="button" className={sortBy === key ? "active" : ""} onClick={() => setSortBy(key)}>
+              {label} ↑
+            </button>
+          ))}
+          <span className="result-count"><Bus size={16} /> Showing {filtered.length} {type === "bus" ? "buses" : type === "flight" ? "flights" : "trains"}{query?.from && query?.to ? ` · ${query.from} to ${query.to}` : ""} on this route</span>
+        </div>
+
+        {type === "bus" && (
+          <div className="popular-filters">
+            <div className="popular-tabs">
+              {[["boarding", "Boarding Points"], ["dropping", "Dropping Points"], ["operators", "Operators"]].map(([key, label]) => (
+                <button key={key} type="button" className={popularTab === key ? "active" : ""} onClick={() => { setPopularTab(key); setSelectedPoint(""); }}>{label}</button>
+              ))}
+            </div>
+            <div className="popular-pills">
+              {(popularTab === "boarding" ? boardingPoints : popularTab === "dropping" ? droppingPoints : operators).map((point) => (
+                <button key={point} type="button" className={selectedPoint === point ? "active" : ""} onClick={() => setSelectedPoint(selectedPoint === point ? "" : point)}>{point}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {type === "bus" && stateTabs.length > 0 && (
           <div className="operator-tabs">
             <button className={activeOperator === "private" ? "active" : ""} onClick={() => setActiveOperator("private")}>Private buses</button>
             {stateTabs.map((brand) => <button key={brand.key} className={activeOperator === brand.key ? "active" : ""} onClick={() => setActiveOperator(brand.key)}><img src={brand.logo} alt={`${brand.title} logo`} /> {brand.title}</button>)}
           </div>
         )}
+
         <div className="mini-offers"><article>Free cancellation</article><article>Flexible date change</article><article>Women traveller care</article></div>
-        <div className="result-summary"><b>{filtered.length} options found</b><span>{timing === "early" ? "Sorted by earliest departure" : "Sorted by lowest price"}</span></div>
+
         <div className="result-list">
           {filtered.map((route) => {
             const brand = operatorBrand(route);
+            const seatsLeft = availableSeats(route);
             return (
               <article key={route.id} className={`result-card ${route.type}`}>
-                <div className="result-card-head"><span className="operator-title">{brand && <img src={brand.logo} alt={`${brand.title} logo`} />}{route.providerName}</span><span>{route.vehicleType} · {route.classType}</span></div>
+                <div className="result-card-head">
+                  <span className="operator-title">{brand && <img src={brand.logo} alt={`${brand.title} logo`} />}{route.providerName}</span>
+                  <span className="rating-badge"><Star size={14} /> {route.rating || 4.3}</span>
+                </div>
+                <div className="result-card-meta">
+                  <span>{route.vehicleType} · {route.classType}</span>
+                  {seatsLeft > 0 && <span className="seats-left"><Armchair size={14} /> {seatsLeft} seats left</span>}
+                </div>
                 <div className="time-row"><b>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b><span>{route.origin} to {route.destination}</span><b>{new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b></div>
                 <div className="amenities">{route.amenities?.map((item) => <span key={item}>{item}</span>)}</div>
-                <div className="fare-row"><strong>₹{Number(route.price).toLocaleString("en-IN")}</strong><button onClick={() => onViewSeats(route)}>View seats</button></div>
+                <div className="fare-row">
+                  <div><small>From</small><strong>₹{Number(route.price).toLocaleString("en-IN")}</strong></div>
+                  <button onClick={() => onViewSeats(route)}>Select Seats</button>
+                </div>
               </article>
             );
           })}
@@ -1097,31 +1327,108 @@ function FloatingAssistant({ user, bookings }) {
   return <div className={`floating-chat ${open ? "open" : ""}`}><button className="chat-launch" onClick={() => setOpen(!open)}><Sparkles size={22} /> Ask Tiara</button>{open && <div className="chat-panel"><h3><span><Bot size={19} /> TravelTimes Assistant</span><button onClick={() => setOpen(false)} aria-label="Close assistant">×</button></h3><div className="chat-window">{chat.map((item, index) => <div key={index} className={`chat-bubble ${item.sender}`}>{item.message}</div>)}</div><textarea placeholder="Ask about booking, boarding, cancellation, tracking, accident support or feedback" value={text} onChange={(e) => setText(e.target.value)} /><div className="chat-actions"><button onClick={() => send("travel_assistance")}><MessageSquare size={16} /> Send</button><button className="urgent" onClick={() => send("emergency")}>Urgent help</button></div></div>}</div>;
 }
 
-function Footer({ setPage }) {
+function CancellationPolicyModal({ onClose }) {
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
   return (
-    <footer className="site-footer">
-      <Logo />
-      <div className="footer-links">
-        <button onClick={() => setPage("packages")}>Tour Packages</button>
-        <button onClick={() => setPage("hotels")}>Hotels</button>
-        <button onClick={() => setPage("support")}>Contact Us</button>
-        <button>About Us</button>
-        <button>Services</button>
-      </div>
-      <div className="footer-policy">
-        <h4>Cancellation policy</h4>
-        <p>TravelTimes follows standard operator cancellation rules to keep refunds fair and transparent for every booking.</p>
-        <ul>
-          <li>Cancel more than 24 hours before departure to receive up to 90% of the base fare.</li>
-          <li>Partial refunds apply for cancellations made between 6 and 24 hours before departure.</li>
-          <li>No refund is provided for no-shows or cancellations within 6 hours of departure.</li>
-          <li>Convenience and payment gateway charges are non-refundable.</li>
-          <li>Approved refunds are processed within 5–7 working days to the original payment method.</li>
-          <li>Operator cancellations qualify for a full refund or free rescheduling.</li>
-        </ul>
-      </div>
-      <span className="footer-note">Comfortable journeys, handpicked stays and memorable holidays.</span>
-    </footer>
+    <div className="policy-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="policy-title" onClick={onClose}>
+      <article className="policy-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="policy-modal-head">
+          <div>
+            <span>Cancellation & Refunds</span>
+            <h2 id="policy-title">TravelTimes cancellation policy</h2>
+          </div>
+          <button type="button" className="policy-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        </div>
+        <div className="policy-modal-body">
+          <p>TravelTimes follows standard operator cancellation rules to keep refunds fair and transparent for every booking.</p>
+          <table>
+            <tbody>
+              <tr><th>Cancellation window</th><th>Refund</th></tr>
+              {cancellationPolicyRows.map(([window, refund]) => <tr key={window}><td>{window}</td><td>{refund}</td></tr>)}
+            </tbody>
+          </table>
+          <ul>
+            <li>Cancel more than 24 hours before departure to receive up to 90% of the base fare.</li>
+            <li>Partial refunds apply for cancellations made between 6 and 24 hours before departure.</li>
+            <li>No refund is provided for no-shows or cancellations within 6 hours of departure.</li>
+            <li>Convenience and payment gateway charges are non-refundable.</li>
+            <li>Approved refunds are processed within 5–7 working days to the original payment method.</li>
+            <li>Operator cancellations qualify for a full refund or free rescheduling.</li>
+            <li>One free date change may be allowed up to 12 hours before departure on selected services.</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  );
+}
+
+function Footer({ setPage }) {
+  const [footerTab, setFooterTab] = useState("routes");
+  const [showPolicy, setShowPolicy] = useState(false);
+  const activeLinks = footerRouteTabs[footerTab].links;
+
+  return (
+    <>
+      <footer className="site-footer">
+        <div className="footer-top">
+          <Logo />
+          <p className="footer-tagline">Comfortable journeys, handpicked stays and memorable holidays across India.</p>
+        </div>
+
+        <div className="footer-tabs">
+          {Object.entries(footerRouteTabs).map(([key, tab]) => (
+            <button key={key} type="button" className={footerTab === key ? "active" : ""} onClick={() => setFooterTab(key)}>{tab.label}</button>
+          ))}
+        </div>
+
+        <div className="footer-link-columns">
+          {activeLinks.map((link) => (
+            <button key={link} type="button" className="footer-route-link" onClick={() => setPage("bus")}>{link}</button>
+          ))}
+        </div>
+
+        <div className="footer-important-links">
+          {[
+            ["bus", "Home"],
+            ["packages", "Offers"],
+            ["support", "About"],
+            ["support", "Contact"],
+            ["support", "FAQ's"],
+            ["policy", "Terms"],
+            ["policy", "Privacy"],
+            ["support", "Responsible Disclosure"],
+            ["support", "Operators"],
+            ["bus", "Routes"],
+            ["support", "Careers"],
+            ["support", "Our Management"],
+            ["support", "Investors Relations"]
+          ].map(([page, label]) => (
+            <button key={label} type="button" onClick={() => page === "policy" ? setShowPolicy(true) : setPage(page)}>{label}</button>
+          ))}
+        </div>
+
+        <div className="footer-bottom-bar">
+          <span>TravelTimes © {new Date().getFullYear()} Le Travenues Technology Ltd. India. All brands are trademarks of their respective owners.</span>
+          <div className="footer-legal">
+            <button type="button" onClick={() => setShowPolicy(true)}>Privacy</button>
+            <button type="button" onClick={() => setShowPolicy(true)}>Terms of Use</button>
+            <button type="button" onClick={() => setPage("support")}>Career</button>
+            <button type="button" onClick={() => setPage("support")}>Customer Service</button>
+            <button type="button" className="policy-link" onClick={() => setShowPolicy(true)}>Cancellation Policy</button>
+          </div>
+          <div className="footer-social">
+            {["f", "X", "in", "▶"].map((icon) => (
+              <a key={icon} href="#" aria-label={`Social ${icon}`} onClick={(event) => event.preventDefault()}>{icon}</a>
+            ))}
+          </div>
+        </div>
+      </footer>
+      {showPolicy && <CancellationPolicyModal onClose={() => setShowPolicy(false)} />}
+    </>
   );
 }
 
