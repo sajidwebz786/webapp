@@ -144,7 +144,7 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .popular-pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .popular-pills button { border: 1px solid #d8dce5; border-radius: 999px; background: white; padding: 7px 14px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .popular-pills button.active, .popular-pills button:hover { border-color: var(--red); background: #fff5f6; color: var(--red); }
-.rating-badge { display: inline-flex; align-items: center; gap: 4px; background: #0b8d44; color: white; border-radius: 8px; padding: 5px 10px; font-weight: 800; font-size: 13px; }
+.rating-badge { display: inline-flex; align-items: center; gap: 4px; background: #0b8d44; color: white !important; border-radius: 8px; padding: 5px 10px; font-weight: 800; font-size: 13px; }
 .result-card-meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
 .seats-left { display: inline-flex; align-items: center; gap: 5px; color: var(--red); font-weight: 700; }
 .fare-row small { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
