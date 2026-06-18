@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
+import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronDown, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
 import { api, tokenStore } from "./services/api";
 import { Logo } from "./components/Logo";
 import apsrtcLogo from "./assets/images/apsrtc-logo.png";
@@ -77,6 +77,46 @@ const footerRouteTabs = {
 function formatDisplayDate(dateValue) {
   const date = new Date(`${dateValue}T00:00:00`);
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function CityDropdown({ value, placeholder, cities, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event) => {
+      if (!ref.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  return (
+    <div className={`city-dropdown ${open ? "open" : ""}`} ref={ref}>
+      <button type="button" className="city-dropdown-trigger" onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open}>
+        <span className={value ? "city-dropdown-value" : "city-dropdown-placeholder"}>{value || placeholder}</span>
+        <ChevronDown size={18} className="city-dropdown-chevron" />
+      </button>
+      {open && (
+        <ul className="city-dropdown-menu" role="listbox">
+          {cities.map((city) => (
+            <li key={city.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={value === city.name}
+                className={value === city.name ? "active" : ""}
+                onClick={() => { onChange(city.name); setOpen(false); }}
+              >
+                {city.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function formatRouteTime(dateValue, offsetMinutes = 0) {
@@ -309,21 +349,25 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
 
       {isBus ? (
         <div className="abhi-search-bar">
-          <label className="abhi-field">
+          <div className="abhi-field">
             <span className="abhi-label"><MapPin size={18} /> Source</span>
-            <select value={query.from} onChange={(e) => { const from = e.target.value; setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}>
-              <option value="">Select city</option>
-              {fromCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}
-            </select>
-          </label>
+            <CityDropdown
+              value={query.from}
+              placeholder="Select city"
+              cities={fromCities}
+              onChange={(from) => { setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}
+            />
+          </div>
           <button type="button" className="swap-btn" onClick={swapCities} aria-label="Swap source and destination"><ArrowDownUp size={18} /></button>
-          <label className="abhi-field">
+          <div className="abhi-field">
             <span className="abhi-label"><MapPin size={18} /> Destination</span>
-            <select value={query.to} onChange={(e) => { const to = e.target.value; setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}>
-              <option value="">Select city</option>
-              {toCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}
-            </select>
-          </label>
+            <CityDropdown
+              value={query.to}
+              placeholder="Select city"
+              cities={toCities}
+              onChange={(to) => { setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}
+            />
+          </div>
           <label className="abhi-field abhi-date" onClick={(e) => e.currentTarget.querySelector('input[type="date"]')?.showPicker?.()}>
             <span className="abhi-label"><CalendarDays size={18} /> Departure</span>
             <span className="abhi-date-display">{formatDisplayDate(query.date)}</span>
