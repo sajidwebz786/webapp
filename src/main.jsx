@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronDown, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
 import { api, tokenStore } from "./services/api";
@@ -81,41 +82,94 @@ function formatDisplayDate(dateValue) {
 
 function CityDropdown({ value, placeholder, cities, onChange }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [menuStyle, setMenuStyle] = useState({});
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const updatePosition = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setMenuStyle({
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: Math.max(rect.width, 220)
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
+    updatePosition();
     const close = (event) => {
-      if (!ref.current?.contains(event.target)) setOpen(false);
+      const inTrigger = triggerRef.current?.contains(event.target);
+      const inMenu = menuRef.current?.contains(event.target);
+      if (!inTrigger && !inMenu) setOpen(false);
     };
+    const reposition = () => updatePosition();
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
   }, [open]);
 
-  return (
-    <div className={`city-dropdown ${open ? "open" : ""}`} ref={ref}>
-      <button type="button" className="city-dropdown-trigger" onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open}>
-        <span className={value ? "city-dropdown-value" : "city-dropdown-placeholder"}>{value || placeholder}</span>
-        <ChevronDown size={18} className="city-dropdown-chevron" />
-      </button>
-      {open && (
-        <ul className="city-dropdown-menu" role="listbox">
-          {cities.map((city) => (
-            <li key={city.id}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={value === city.name}
-                className={value === city.name ? "active" : ""}
-                onClick={() => { onChange(city.name); setOpen(false); }}
-              >
-                {city.name}
-              </button>
-            </li>
-          ))}
-        </ul>
+  const selectCity = (cityName) => {
+    onChange(cityName);
+    setOpen(false);
+  };
+
+  const menu = open ? createPortal(
+    <ul
+      ref={menuRef}
+      className="city-dropdown-menu"
+      role="listbox"
+      style={{ position: "fixed", zIndex: 1000, ...menuStyle }}
+    >
+      {cities.length ? cities.map((city) => (
+        <li key={city.id || city.name}>
+          <button
+            type="button"
+            role="option"
+            aria-selected={value === city.name}
+            className={value === city.name ? "active" : ""}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => selectCity(city.name)}
+          >
+            {city.name}
+          </button>
+        </li>
+      )) : (
+        <li className="city-dropdown-empty">Loading cities…</li>
       )}
-    </div>
+    </ul>,
+    document.body
+  ) : null;
+
+  return (
+    <>
+      <div className={`city-dropdown ${open ? "open" : ""}`}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className="city-dropdown-trigger"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            setOpen((current) => {
+              if (!current) updatePosition();
+              return !current;
+            });
+          }}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span className={value ? "city-dropdown-value" : "city-dropdown-placeholder"}>{value || placeholder}</span>
+          <ChevronDown size={18} className="city-dropdown-chevron" />
+        </button>
+      </div>
+      {menu}
+    </>
   );
 }
 
