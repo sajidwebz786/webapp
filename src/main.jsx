@@ -1169,8 +1169,10 @@ function PackagesPage({ packages }) {
 }
 
 function AuthPage({ user, setUser, setPage, pendingCheckout }) {
-  const [mode, setMode] = useState("login");
+  const resetTokenFromUrl = new URLSearchParams(window.location.search).get("resetToken") || "";
+  const [mode, setMode] = useState(resetTokenFromUrl ? "reset" : "login");
   const [form, setForm] = useState({ name: "", email: "customer@orbitatravels.com", phone: "", password: "customer123" });
+  const [resetForm, setResetForm] = useState({ email: "", token: resetTokenFromUrl, password: "" });
   const [message, setMessage] = useState("");
 
   const oauthLogin = async (provider) => {
@@ -1221,28 +1223,69 @@ function AuthPage({ user, setUser, setPage, pendingCheckout }) {
     }
   };
 
+  const requestReset = async (event) => {
+    event.preventDefault();
+    try {
+      const data = await api("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email: resetForm.email || form.email }) });
+      setMessage(data.resetLink ? `${data.message} Reset link for testing: ${data.resetLink}` : data.message);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  const resetPassword = async (event) => {
+    event.preventDefault();
+    try {
+      const data = await api("/auth/reset-password", { method: "POST", body: JSON.stringify({ token: resetForm.token, password: resetForm.password }) });
+      tokenStore.set(data.token);
+      setUser(data.user);
+      window.history.replaceState({}, "", "/");
+      setPage(pendingCheckout ? "checkout" : "dashboard");
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
   if (user) {
     return <section className="page-band account-page"><div className="page-heading"><UserRound size={34} /><div><h1>You are logged in</h1><p>Continue to your dashboard or complete the selected booking.</p></div></div><button className="primary" onClick={() => setPage(pendingCheckout ? "checkout" : "dashboard")}>Continue</button></section>;
   }
 
   return (
     <section className="page-band account-page">
-      <div className="page-heading"><UserRound size={34} /><div><h1>{mode === "login" ? "Login to Orbita Travels" : "Create your Orbita Travels account"}</h1><p>Email and mobile number are collected so ticket email and SMS gateways can be enabled later.</p></div></div>
-      <form className="auth-card" onSubmit={submit}>
-        <div className="segmented-auth"><button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Login</button><button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Register</button></div>
-        {mode === "register" && <input placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />}
-        <input placeholder="Email address" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        {mode === "register" && <input placeholder="Mobile number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />}
-        <input placeholder="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-        <button className="primary" type="submit">{mode === "login" ? "Login" : "Create account"}</button>
-        <div className="oauth-divider"><span>or continue securely with</span></div>
-        <div className="oauth-row">
-          <button type="button" aria-label="Continue with Google" title="Continue with Google" onClick={() => oauthLogin("google")}><span className="social-icon google-mark">G</span></button>
-          <button type="button" aria-label="Continue with Facebook" title="Continue with Facebook" onClick={() => oauthLogin("facebook")}><span className="social-icon facebook-mark">f</span></button>
-          <button type="button" aria-label="Continue with Apple" title="Continue with Apple" onClick={() => oauthLogin("apple")}><span className="social-icon apple-mark">A</span></button>
-        </div>
-        {message && <div className="success-note">{message}</div>}
-      </form>
+      <div className="page-heading"><UserRound size={34} /><div><h1>{mode === "forgot" ? "Reset your password" : mode === "reset" ? "Create a new password" : mode === "login" ? "Login to Orbita Travels" : "Create your Orbita Travels account"}</h1><p>{mode === "forgot" ? "Enter your registered email and we will prepare reset instructions." : mode === "reset" ? "Use the secure reset token from your email to set a new password." : "Email and mobile number are collected so ticket email and SMS gateways can be enabled later."}</p></div></div>
+      {mode === "forgot" ? (
+        <form className="auth-card" onSubmit={requestReset}>
+          <input placeholder="Registered email address" value={resetForm.email} onChange={(e) => setResetForm({ ...resetForm, email: e.target.value })} />
+          <button className="primary" type="submit">Send reset instructions</button>
+          <button className="link-button" type="button" onClick={() => { setMode("login"); setMessage(""); }}>Back to login</button>
+          {message && <div className="success-note">{message}</div>}
+        </form>
+      ) : mode === "reset" ? (
+        <form className="auth-card" onSubmit={resetPassword}>
+          <input placeholder="Reset token" value={resetForm.token} onChange={(e) => setResetForm({ ...resetForm, token: e.target.value })} />
+          <input placeholder="New password" type="password" value={resetForm.password} onChange={(e) => setResetForm({ ...resetForm, password: e.target.value })} />
+          <button className="primary" type="submit">Update password</button>
+          <button className="link-button" type="button" onClick={() => { setMode("login"); setMessage(""); }}>Back to login</button>
+          {message && <div className="success-note">{message}</div>}
+        </form>
+      ) : (
+        <form className="auth-card" onSubmit={submit}>
+          <div className="segmented-auth"><button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Login</button><button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Register</button></div>
+          {mode === "register" && <input placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />}
+          <input placeholder="Email address" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          {mode === "register" && <input placeholder="Mobile number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />}
+          <input placeholder="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          {mode === "login" && <button className="forgot-link" type="button" onClick={() => { setMode("forgot"); setResetForm({ ...resetForm, email: form.email }); setMessage(""); }}>Forgot password?</button>}
+          <button className="primary" type="submit">{mode === "login" ? "Login" : "Create account"}</button>
+          <div className="oauth-divider"><span>or continue securely with</span></div>
+          <div className="oauth-row">
+            <button type="button" aria-label="Continue with Google" title="Continue with Google" onClick={() => oauthLogin("google")}><span className="social-icon google-mark">G</span></button>
+            <button type="button" aria-label="Continue with Facebook" title="Continue with Facebook" onClick={() => oauthLogin("facebook")}><span className="social-icon facebook-mark">f</span></button>
+            <button type="button" aria-label="Continue with Apple" title="Continue with Apple" onClick={() => oauthLogin("apple")}><span className="social-icon apple-mark">A</span></button>
+          </div>
+          {message && <div className="success-note">{message}</div>}
+        </form>
+      )}
     </section>
   );
 }

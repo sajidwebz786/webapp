@@ -351,6 +351,9 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .support-card textarea { min-height: 150px; resize: vertical; }
 .auth-card { width: min(520px, 100%); background: white; border-radius: 16px; padding: 20px; box-shadow: 0 18px 42px rgba(13, 41, 82, .12); display: grid; gap: 12px; }
 .auth-card input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.forgot-link, .link-button { border: 0; background: transparent; color: var(--blue); font-weight: 800; justify-self: end; padding: 4px 0; }
+.link-button { justify-self: start; }
+.forgot-link:hover, .link-button:hover { color: var(--red); }
 .oauth-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
 .oauth-divider:before, .oauth-divider:after { content: ""; height: 1px; background: var(--line); flex: 1; }
 .oauth-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
