@@ -1045,7 +1045,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
 }
 
 function LoginInline({ setUser }) {
-  const [form, setForm] = useState({ email: "customer@traveltimes.com", password: "customer123" });
+  const [form, setForm] = useState({ email: "customer@orbitatravels.com", password: "customer123" });
   const [message, setMessage] = useState("");
   const login = async () => {
     try {
@@ -1140,11 +1140,11 @@ function Testimonials() {
     <section className="clean-section narrow testimonial-section">
       <div className="section-head">
         <h2>Testimonials</h2>
-        <p className="section-subtitle">Hear from travellers who plan journeys with TravelTimes.</p>
+        <p className="section-subtitle">Hear from travellers who plan journeys with Orbita Travels.</p>
       </div>
       <div className="testimonial-row">
         <article>
-          <p>“Each bus was clean, punctual and easy to book. TravelTimes made the whole journey seamless from search to boarding.”</p>
+          <p>“Each bus was clean, punctual and easy to book. Orbita Travels made the whole journey seamless from search to boarding.”</p>
           <footer>— Anjali, frequent commuter</footer>
         </article>
         <article>
@@ -1170,7 +1170,7 @@ function PackagesPage({ packages }) {
 
 function AuthPage({ user, setUser, setPage, pendingCheckout }) {
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ name: "", email: "customer@traveltimes.com", phone: "", password: "customer123" });
+  const [form, setForm] = useState({ name: "", email: "customer@orbitatravels.com", phone: "", password: "customer123" });
   const [message, setMessage] = useState("");
 
   const oauthLogin = async (provider) => {
@@ -1196,7 +1196,7 @@ function AuthPage({ user, setUser, setPage, pendingCheckout }) {
         body: JSON.stringify({
           provider,
           providerId: `${provider}-${form.email}`,
-          name: form.name || form.email.split("@")[0] || "TravelTimes Traveller",
+          name: form.name || form.email.split("@")[0] || "Orbita Traveller",
           email: form.email,
           phone: form.phone
         })
@@ -1227,7 +1227,7 @@ function AuthPage({ user, setUser, setPage, pendingCheckout }) {
 
   return (
     <section className="page-band account-page">
-      <div className="page-heading"><UserRound size={34} /><div><h1>{mode === "login" ? "Login to TravelTimes" : "Create your TravelTimes account"}</h1><p>Email and mobile number are collected so ticket email and SMS gateways can be enabled later.</p></div></div>
+      <div className="page-heading"><UserRound size={34} /><div><h1>{mode === "login" ? "Login to Orbita Travels" : "Create your Orbita Travels account"}</h1><p>Email and mobile number are collected so ticket email and SMS gateways can be enabled later.</p></div></div>
       <form className="auth-card" onSubmit={submit}>
         <div className="segmented-auth"><button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Login</button><button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Register</button></div>
         {mode === "register" && <input placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />}
@@ -1291,7 +1291,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
   const draft = pendingCheckout;
   return (
     <section className="page-band checkout-page">
-      <div className="page-heading"><CalendarDays size={34} /><div><h1>{confirmed ? "Booking successful" : "Review your ticket"}</h1><p>{confirmed ? "Your printable TravelTimes ticket is ready." : "Confirm traveller details before purchasing the ticket."}</p></div></div>
+      <div className="page-heading"><CalendarDays size={34} /><div><h1>{confirmed ? "Booking successful" : "Review your ticket"}</h1><p>{confirmed ? "Your printable Orbita Travels ticket is ready." : "Confirm traveller details before purchasing the ticket."}</p></div></div>
       <article className="print-ticket">
         <div className="ticket-head"><Logo /><strong>{confirmed?.bookingCode || "PNR will be generated after purchase"}</strong></div>
         <h2>{draft.route.providerName}</h2>
@@ -1340,7 +1340,7 @@ function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
         <article className="dash-panel wide-panel"><h3>Current bookings</h3>{current.map((booking) => <BookingCard key={booking.id} booking={booking} onCancel={() => cancelBooking(booking)} onViewTicket={() => setSelectedTicket(booking)} />)}{!current.length && <p>No current bookings yet.</p>}</article>
         <article className="dash-panel"><h3>Previous bookings</h3>{previous.map((booking) => <BookingCard key={booking.id} booking={booking} compact onViewTicket={() => setSelectedTicket(booking)} />)}{!previous.length && <p>No previous bookings yet.</p>}</article>
         <article className="dash-panel"><h3>Quick actions</h3><button onClick={() => setPage("bus")}>Book bus</button><button onClick={() => setPage("flight")}>Book flight</button><button onClick={() => setPage("train")}>Book train</button><button onClick={() => setPage("support")}>Raise support request</button></article>
-        <article className="dash-panel reward-panel wide-panel"><h3>TravelTimes Rewards</h3><strong>{rewardPoints.toLocaleString("en-IN")} points</strong><p>Earn points on every confirmed booking and redeem them for journey benefits when offers are enabled.</p><div><span>Upcoming trips</span><b>{upcoming}</b></div><div><span>Rail and air trips</span><b>{railAirTrips}</b></div></article>
+        <article className="dash-panel reward-panel wide-panel"><h3>Orbita Rewards</h3><strong>{rewardPoints.toLocaleString("en-IN")} points</strong><p>Earn points on every confirmed booking and redeem them for journey benefits when offers are enabled.</p><div><span>Upcoming trips</span><b>{upcoming}</b></div><div><span>Rail and air trips</span><b>{railAirTrips}</b></div></article>
       </div>
       {selectedTicket && <TicketWindow booking={selectedTicket} onClose={() => setSelectedTicket(null)} />}
     </section>
@@ -1348,12 +1348,12 @@ function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
 }
 
 function BookingCard({ booking, onCancel, compact, onViewTicket }) {
-  const title = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "TravelTimes booking";
+  const title = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "Orbita Travels booking";
   return <div className="booking-card"><div><b>{booking.bookingCode}</b><span>{booking.type} · {title}</span></div><div><small>{booking.travelDate}</small><strong>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</strong></div><div className="tracking-line">Live updates · {booking.status}</div><div className="booking-actions"><button onClick={onViewTicket}>View ticket</button>{!compact && <><button>Modify</button><button onClick={onCancel}>Request cancellation</button><button>Re-book</button></>}</div></div>;
 }
 
 function TicketWindow({ booking, onClose }) {
-  const providerName = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "TravelTimes";
+  const providerName = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "Orbita Travels";
   const from = booking.metadata?.origin || booking.TransportRoute?.origin || "-";
   const to = booking.metadata?.destination || booking.TransportRoute?.destination || "-";
   const seats = booking.selectedSeats?.length ? booking.selectedSeats : (booking.passengers || []).map((passenger) => passenger.seat).filter(Boolean);
@@ -1362,7 +1362,7 @@ function TicketWindow({ booking, onClose }) {
       <article className="ticket-window">
         <div className="ticket-window-head">
           <div>
-            <span>TravelTimes e-ticket</span>
+            <span>Orbita Travels e-ticket</span>
             <h3>{booking.bookingCode}</h3>
           </div>
           <button className="ticket-window-close" onClick={onClose}>Close</button>
@@ -1406,7 +1406,7 @@ function SupportForm({ user, bookings }) {
   const createTicket = async () => {
     if (!user) return setMessage("Please login so our support team can connect this request to your account.");
     await api("/support/tickets", { method: "POST", body: JSON.stringify(support) });
-    setMessage("Your request has been shared with TravelTimes support.");
+    setMessage("Your request has been shared with Orbita Travels support.");
   };
   return <div className="support-card"><select value={support.bookingId} onChange={(e) => setSupport({ ...support, bookingId: e.target.value })}><option value="">Select booking if available</option>{bookings.map((booking) => <option key={booking.id} value={booking.id}>{booking.bookingCode}</option>)}</select><select value={support.category} onChange={(e) => setSupport({ ...support, category: e.target.value })}><option value="general">General</option><option value="boarding">Boarding</option><option value="technical_issue">Technical issue</option><option value="accident">Accident / emergency</option><option value="cancellation">Cancellation</option><option value="grievance">Grievance</option><option value="feedback">Feedback</option></select><select value={support.priority} onChange={(e) => setSupport({ ...support, priority: e.target.value })}><option value="normal">Normal</option><option value="urgent">Urgent</option><option value="emergency">Emergency</option></select><input placeholder="Subject" value={support.subject} onChange={(e) => setSupport({ ...support, subject: e.target.value })} /><textarea placeholder="Tell us what happened" value={support.message} onChange={(e) => setSupport({ ...support, message: e.target.value })} /><button className="primary" onClick={createTicket}>Send request</button>{message && <div className="success-note">{message}</div>}</div>;
 }
@@ -1427,7 +1427,7 @@ function FloatingAssistant({ user, bookings }) {
     }
     setText("");
   };
-  return <div className={`floating-chat ${open ? "open" : ""}`}><button className="chat-launch" onClick={() => setOpen(!open)}><Sparkles size={22} /> Ask Tiara</button>{open && <div className="chat-panel"><h3><span><Bot size={19} /> TravelTimes Assistant</span><button onClick={() => setOpen(false)} aria-label="Close assistant">×</button></h3><div className="chat-window">{chat.map((item, index) => <div key={index} className={`chat-bubble ${item.sender}`}>{item.message}</div>)}</div><textarea placeholder="Ask about booking, boarding, cancellation, tracking, accident support or feedback" value={text} onChange={(e) => setText(e.target.value)} /><div className="chat-actions"><button onClick={() => send("travel_assistance")}><MessageSquare size={16} /> Send</button><button className="urgent" onClick={() => send("emergency")}>Urgent help</button></div></div>}</div>;
+  return <div className={`floating-chat ${open ? "open" : ""}`}><button className="chat-launch" onClick={() => setOpen(!open)}><Sparkles size={22} /> Ask Tiara</button>{open && <div className="chat-panel"><h3><span><Bot size={19} /> Orbita Travels Assistant</span><button onClick={() => setOpen(false)} aria-label="Close assistant">×</button></h3><div className="chat-window">{chat.map((item, index) => <div key={index} className={`chat-bubble ${item.sender}`}>{item.message}</div>)}</div><textarea placeholder="Ask about booking, boarding, cancellation, tracking, accident support or feedback" value={text} onChange={(e) => setText(e.target.value)} /><div className="chat-actions"><button onClick={() => send("travel_assistance")}><MessageSquare size={16} /> Send</button><button className="urgent" onClick={() => send("emergency")}>Urgent help</button></div></div>}</div>;
 }
 
 function CancellationPolicyModal({ onClose }) {
@@ -1442,12 +1442,12 @@ function CancellationPolicyModal({ onClose }) {
         <div className="policy-modal-head">
           <div>
             <span>Cancellation & Refunds</span>
-            <h2 id="policy-title">TravelTimes cancellation policy</h2>
+            <h2 id="policy-title">Orbita Travels cancellation policy</h2>
           </div>
           <button type="button" className="policy-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
         </div>
         <div className="policy-modal-body">
-          <p>TravelTimes follows standard operator cancellation rules to keep refunds fair and transparent for every booking.</p>
+          <p>Orbita Travels follows standard operator cancellation rules to keep refunds fair and transparent for every booking.</p>
           <table>
             <tbody>
               <tr><th>Cancellation window</th><th>Refund</th></tr>
@@ -1515,7 +1515,7 @@ function Footer({ setPage }) {
         </div>
 
         <div className="footer-bottom-bar">
-          <span>TravelTimes © {new Date().getFullYear()} Le Travenues Technology Ltd. India. All brands are trademarks of their respective owners.</span>
+          <span>Orbita Travels © {new Date().getFullYear()}. All brands are trademarks of their respective owners.</span>
           <div className="footer-legal">
             <button type="button" onClick={() => setShowPolicy(true)}>Privacy</button>
             <button type="button" onClick={() => setShowPolicy(true)}>Terms of Use</button>

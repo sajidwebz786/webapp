@@ -2,5 +2,5 @@ import React from "react";
 import logoImg from "../assets/images/logo.png";
 
 export function Logo() {
-  return <img className="brand-logo" src={logoImg} alt="TravelTimes logo" />;
+  return <img className="brand-logo" src={logoImg} alt="Orbita Travels logo" />;
 }
