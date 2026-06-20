@@ -80,6 +80,11 @@ function formatDisplayDate(dateValue) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function formatRating(rating, fallback = 4.3) {
+  const value = Number(rating ?? fallback);
+  return Number.isFinite(value) ? value.toFixed(1) : String(fallback);
+}
+
 function CityDropdown({ value, placeholder, cities, onChange }) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState({});
@@ -1017,7 +1022,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
               <article key={route.id} className={`result-card ${route.type}`}>
                 <div className="result-card-head">
                   <span className="operator-title">{brand && <img src={brand.logo} alt={`${brand.title} logo`} />}{route.providerName}</span>
-                  <span className="rating-badge"><Star size={14} /> {route.rating || 4.3}</span>
+                  <span className="rating-badge"><Star size={14} strokeWidth={2.5} /> {formatRating(route.rating)}</span>
                 </div>
                 <div className="result-card-meta">
                   <span>{route.vehicleType} · {route.classType}</span>
