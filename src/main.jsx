@@ -561,7 +561,7 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   const isMixed = layoutType.includes("mixed") || layoutType.includes("sleeper-seater");
   const seats = route.seatLayout?.seats || [];
   if (route.externalProvider === "bdsd" && !seats.length) {
-    return <div className="empty-results">Live BDSD seat layout is not available for this bus yet.</div>;
+    return <div className="empty-results">Seat layout is not available for this bus yet.</div>;
   }
   const lower = buildDeckLayout(seats.filter((seat) => (isSleeper || isMixed ? seat.deck !== "upper" : true) && !seat.isWalkway), isSleeper || isMixed);
   const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
@@ -1034,7 +1034,6 @@ function JourneyResults({ type, results, query, onViewSeats }) {
                   <span className="operator-title">{brand && <img src={brand.logo} alt={`${brand.title} logo`} />}{route.providerName}</span>
                   <span className="rating-badge"><Star size={14} strokeWidth={2.5} /> {formatRating(route.rating)}</span>
                 </div>
-                {route.externalProvider === "bdsd" && <span className="provider-source-badge">BDSD live API</span>}
                 <div className="result-card-meta">
                   <span>{route.vehicleType} · {route.classType}</span>
                   {type === "bus" && seatsLeft > 0 && <span className="seats-left"><Armchair size={14} /> {seatsLeft} seats left</span>}
@@ -1075,7 +1074,7 @@ function SeatMap({ route, selected, setSelected }) {
   const unavailable = new Set(route.seatLayout?.unavailable || []);
   const seats = route.seatLayout?.seats || [];
   if (route.externalProvider === "bdsd" && !seats.length) {
-    return <div className="empty-results">Live BDSD seat layout is not available for this bus yet.</div>;
+    return <div className="empty-results">Seat layout is not available for this bus yet.</div>;
   }
   const toggle = (id) => {
     if (unavailable.has(id)) return;
@@ -1197,7 +1196,7 @@ function HotelsPage({ hotels, setPage, setPendingCheckout }) {
     setPage("auth");
   };
 
-  return <section className="page-band"><div className="page-heading"><Hotel size={34} /><div><h1>Hotels</h1><p>Live BDSD stays for holidays, business trips and family travel.</p></div></div><div className="card-grid">{hotels.map((hotel) => <article className="travel-card" key={hotel.id || hotel.externalHotelCode || hotel.name}><img src={hotel.imageUrl} alt={hotel.name} /><div><span>{hotel.starRating} star · {hotel.city}</span><h3>{hotel.name}</h3><p>{hotel.amenities?.join(" · ")}</p></div><footer><b>₹{Number(hotel.pricePerNight).toLocaleString("en-IN")}/night</b><button onClick={() => bookHotel(hotel)}>Book room</button></footer></article>)}</div>{!hotels.length && <div className="empty-results">No live BDSD hotels are available for the configured city/date right now.</div>}</section>;
+  return <section className="page-band"><div className="page-heading"><Hotel size={34} /><div><h1>Hotels</h1><p>Search stays for holidays, business trips and family travel.</p></div></div><div className="card-grid">{hotels.map((hotel) => <article className="travel-card" key={hotel.id || hotel.externalHotelCode || hotel.name}><img src={hotel.imageUrl} alt={hotel.name} /><div><span>{hotel.starRating} star · {hotel.city}</span><h3>{hotel.name}</h3><p>{hotel.amenities?.join(" · ")}</p></div><footer><b>₹{Number(hotel.pricePerNight).toLocaleString("en-IN")}/night</b><button onClick={() => bookHotel(hotel)}>Book room</button></footer></article>)}</div>{!hotels.length && <div className="empty-results">No hotels are available for the selected city/date right now.</div>}</section>;
 }
 
 function PackagesPage({ packages }) {
