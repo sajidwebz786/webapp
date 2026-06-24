@@ -602,9 +602,28 @@ function buildDeckLayout(seats, berthLike) {
     row: seat.row + (minRow === 0 ? 1 : 0),
     column: seat.column + (minColumn === 0 ? 1 : 0)
   }));
-  const maxColumn = Math.max(5, ...prepared.map((seat) => seat.column + seat.width - 1));
-  const rows = [...new Set(prepared.map((seat) => seat.row))].sort((a, b) => a - b);
-  return { seats: prepared.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
+  const rowCount = new Set(prepared.map((seat) => seat.row)).size;
+  const columnCount = new Set(prepared.map((seat) => seat.column)).size;
+  const shouldRotate = !berthLike && columnCount > rowCount;
+  const oriented = shouldRotate
+    ? prepared.map((seat) => ({
+      ...seat,
+      row: seat.column,
+      column: seat.row,
+      width: Math.max(1, Number(seat.height || 1)),
+      height: 1
+    }))
+    : prepared;
+  const orientedMinRow = Math.min(...oriented.map((seat) => seat.row));
+  const orientedMinColumn = Math.min(...oriented.map((seat) => seat.column));
+  const finalSeats = oriented.map((seat) => ({
+    ...seat,
+    row: seat.row - orientedMinRow + 1,
+    column: seat.column - orientedMinColumn + 1
+  }));
+  const maxColumn = Math.max(berthLike ? 4 : 2, ...finalSeats.map((seat) => seat.column + seat.width - 1));
+  const rows = [...new Set(finalSeats.map((seat) => seat.row))].sort((a, b) => a - b);
+  return { seats: finalSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
 }
 
 function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, baseFare }) {
@@ -612,7 +631,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
     const sold = unavailable.has(seat.id);
     const chosen = selected.includes(seat.id);
     const women = seat.ladies || index % 7 === 2;
-    const berth = Boolean(seat.isBerth || sleeper || (mixed && Number(seat.height || 1) > 1));
+    const berth = Boolean((sleeper || mixed) && seat.isBerth);
     const fare = Number(seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
 
     return (
@@ -621,7 +640,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
         className={`${berth ? "sleeper-berth" : "chair-seat"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
         onClick={() => toggle(seat.id)}
         aria-label={`${title} seat ${seat.id}`}
-        style={{ gridColumn: `${seat.column} / span ${seat.width || 1}`, gridRow: `${seat.row} / span ${seat.height || 1}` }}
+        style={{ gridColumn: `${seat.column} / span ${berth ? seat.width || 1 : 1}`, gridRow: `${seat.row} / span ${berth ? seat.height || 1 : 1}` }}
       >
         <b>{seat.label || seat.id}</b>
         {berth ? <span className="pillow" /> : <Armchair size={17} />}
@@ -635,7 +654,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
       <div className="deck-head"><h3>{title}</h3><span>Driver</span></div>
       <div className="bus-front-marker"><i /> <b>FRONT OF VEHICLE</b></div>
       <div className="vehicle-icons"><span>WC</span><span>Door</span></div>
-      <div className="portrait-seat-grid live-seat-grid" style={{ gridTemplateColumns: `repeat(${layout.columns}, 46px)` }}>
+      <div className="portrait-seat-grid live-seat-grid" style={{ gridTemplateColumns: `repeat(${layout.columns}, 58px)` }}>
         {layout.seats.map(renderSeat)}
       </div>
       <div className="rear-marker">REAR</div>

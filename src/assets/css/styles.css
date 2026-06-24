@@ -244,7 +244,7 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .booking-tabs { position: sticky; top: 82px; z-index: 13; margin: 0; }
 .dedicated-seat-screen { width: calc(100% - 24px); max-width: 1180px; margin: 18px auto; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(350px, 0.85fr); gap: 16px; align-items: start; min-width: 0; }
 .portrait-chart-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; min-width: 0; }
-.deck-card { background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 24px 18px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; overflow-x: auto; }
+.deck-card { background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 24px 18px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; overflow: hidden; }
 .deck-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .deck-head h3 { margin: 0; font-size: 15px; }
 .deck-head span { min-width: 58px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #6f7480; border: 1px solid #c5ccdc; font-size: 11px; font-weight: 850; margin-left: auto; }
@@ -252,15 +252,15 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .bus-front-marker i { display: block; width: 120px; height: 7px; border-radius: 999px; background: #cbe0ff; }
 .vehicle-icons { display: flex; justify-content: space-around; align-items: center; color: #777b88; margin-bottom: 22px; font-size: 12px; font-weight: 850; }
 .vehicle-icons span { min-width: 46px; height: 34px; display: grid; place-items: center; border: 1px solid #d8deea; border-radius: 8px; background: #fbfcff; }
-.portrait-seat-grid { display: grid; justify-content: center; gap: 12px 14px; max-height: none; overflow: visible; padding: 8px 8px 18px; grid-auto-rows: 42px; grid-auto-flow: dense; }
+.portrait-seat-grid { display: grid; justify-content: center; gap: 12px 18px; max-height: none; overflow: visible; padding: 8px 8px 18px; grid-auto-rows: 58px; grid-auto-flow: dense; }
 .seater-grid { grid-template-columns: repeat(4, 36px); }
 .sleeper-grid, .mixed-grid { grid-template-columns: 46px 34px 46px 46px; align-items: start; }
-.live-seat-grid { min-width: max-content; }
+.live-seat-grid { max-width: 100%; margin: 0 auto; }
 .walkway { width: 34px; height: 66px; background: transparent; border: 0; }
 .walkway::before,
 .walkway::after { content: ""; }
 .chair-seat, .sleeper-berth { position: relative; border: 1.5px solid #aeb7cb; background: #ffffff; color: #111827; border-radius: 9px; display: grid; place-items: center; gap: 2px; box-shadow: 0 5px 12px rgba(20, 36, 65, .05); transition: transform .16s ease, box-shadow .16s ease, background .16s ease; }
-.chair-seat { width: 46px; height: 42px; }
+.chair-seat { width: 58px; height: 58px; }
 .sleeper-berth { width: 46px; height: 96px; }
 .chair-seat b, .sleeper-berth b { font-size: 12px; line-height: 1; }
 .chair-seat small, .sleeper-berth small { font-size: 8px; color: #6b7280; }
