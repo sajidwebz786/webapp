@@ -168,6 +168,7 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .result-card-head { align-items: center; }
 .operator-title { display: inline-flex; align-items: center; gap: 10px; color: var(--ink) !important; font-weight: 850; }
 .operator-title img { width: 42px; height: 42px; object-fit: contain; border-radius: 50%; border: 1px solid var(--line); background: white; padding: 3px; }
+.provider-source-badge { width: fit-content; display: inline-flex; align-items: center; border: 1px solid rgba(7, 87, 200, .18); border-radius: 999px; padding: 5px 9px; background: #eef5ff; color: var(--blue-dark) !important; font-size: 11px; font-weight: 850; text-transform: uppercase; letter-spacing: .04em; }
 .result-card span { color: var(--muted); }
 .time-row { display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; gap: 12px; }
 .amenities { display: flex; gap: 8px; flex-wrap: wrap; }

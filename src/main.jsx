@@ -467,6 +467,8 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
 
 function BookingPage({ activeJourney, setPage, user, setPendingCheckout }) {
   const [step, setStep] = useState("points");
+  const [liveRoute, setLiveRoute] = useState(null);
+  const [livePoints, setLivePoints] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [passengers, setPassengers] = useState(user ? [{ name: user.name || "", age: "", gender: "Male", seat: "" }] : [{ ...initialPassenger }]);
   const [contact, setContact] = useState(user ? { email: user.email || "", phone: user.phone || "", emergencyPhone: "" } : { email: "", phone: "", emergencyPhone: "" });
@@ -479,19 +481,40 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout }) {
     setContact((current) => ({ ...current, email: current.email || user.email || "", phone: current.phone || user.phone || "" }));
   }, [user?.id]);
 
+  useEffect(() => {
+    const selectedRoute = activeJourney?.route;
+    if (!selectedRoute?.id) return;
+    setLiveRoute(selectedRoute);
+    setLivePoints(null);
+    api(`/transport/${selectedRoute.type}/${selectedRoute.id}/seats`).then((seatLayout) => {
+      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout }));
+    }).catch(() => {});
+    api(`/transport/${selectedRoute.type}/${selectedRoute.id}/points`).then(setLivePoints).catch(() => {});
+  }, [activeJourney?.route?.id]);
+
   if (!activeJourney) {
     return <section className="page-band"><div className="page-heading"><Bus size={34} /><div><h1>No journey selected</h1><p>Please choose a service from the search results first.</p></div></div><button className="primary" onClick={() => setPage("bus")}>Search buses</button></section>;
   }
 
-  const { route, query } = activeJourney;
-  const boardingPoints = [`${route.origin} Central`, `${route.origin} Circle`, `${route.origin} Bus Terminal`, `${route.origin} Highway Pickup`];
-  const droppingPoints = [`${route.destination} Central`, `${route.destination} Market`, `${route.destination} Bus Terminal`, `${route.destination} City Drop`];
+  const { query } = activeJourney;
+  const route = liveRoute || activeJourney.route;
+
+  const boardingPointOptions = livePoints?.boardingPoints?.length
+    ? livePoints.boardingPoints
+    : [`${route.origin} Central`, `${route.origin} Circle`, `${route.origin} Bus Terminal`, `${route.origin} Highway Pickup`].map((name, index) => ({ id: index + 1, name }));
+  const droppingPointOptions = livePoints?.droppingPoints?.length
+    ? livePoints.droppingPoints
+    : [`${route.destination} Central`, `${route.destination} Market`, `${route.destination} Bus Terminal`, `${route.destination} City Drop`].map((name, index) => ({ id: index + 1, name }));
+  const boardingPoints = boardingPointOptions.map((point) => point.name);
+  const droppingPoints = droppingPointOptions.map((point) => point.name);
   const seats = selectedSeats.length ? selectedSeats : passengers.map((_, index) => `AUTO-${index + 1}`);
   const total = Number(route.price) * Math.max(seats.length, passengers.length);
   const canContinue = step === "points" ? boardingPoint && dropPoint : step === "seats" ? selectedSeats.length > 0 : true;
 
   const buy = () => {
-    setPendingCheckout({ route, query, selectedSeats: seats, passengers, contact, boardingPoint, dropPoint, totalAmount: total });
+    const selectedBoarding = boardingPointOptions.find((point) => point.name === boardingPoint);
+    const selectedDrop = droppingPointOptions.find((point) => point.name === dropPoint);
+    setPendingCheckout({ route, query, selectedSeats: seats, passengers, contact, boardingPoint, dropPoint, boardingPointId: selectedBoarding?.id, dropPointId: selectedDrop?.id, totalAmount: total });
     setPage(user ? "checkout" : "auth");
   };
 
@@ -1024,6 +1047,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
                   <span className="operator-title">{brand && <img src={brand.logo} alt={`${brand.title} logo`} />}{route.providerName}</span>
                   <span className="rating-badge"><Star size={14} strokeWidth={2.5} /> {formatRating(route.rating)}</span>
                 </div>
+                {route.externalProvider === "bdsd" && <span className="provider-source-badge">BDSD live API</span>}
                 <div className="result-card-meta">
                   <span>{route.vehicleType} · {route.classType}</span>
                   {seatsLeft > 0 && <span className="seats-left"><Armchair size={14} /> {seatsLeft} seats left</span>}
@@ -1318,7 +1342,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
           passengers: draft.passengers.map((passenger, index) => ({ ...passenger, seat: draft.selectedSeats[index] })),
           contact: draft.contact,
           totalAmount: draft.totalAmount,
-          metadata: { origin: draft.route.origin, destination: draft.route.destination, tripType: draft.query.tripType, returnDate: draft.query.returnDate, boardingPoint: draft.boardingPoint, dropPoint: draft.dropPoint }
+          metadata: { origin: draft.route.origin, destination: draft.route.destination, tripType: draft.query.tripType, returnDate: draft.query.returnDate, boardingPoint: draft.boardingPoint, dropPoint: draft.dropPoint, boardingPointId: draft.boardingPointId, dropPointId: draft.dropPointId }
         })
       });
       setConfirmed(booking);
