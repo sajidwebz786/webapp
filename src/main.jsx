@@ -347,7 +347,11 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   const [message, setMessage] = useState("");
   const [searching, setSearching] = useState(false);
   const resultsRef = useRef(null);
-  const selectedCities = cities.filter((city) => query.scope === "international" ? city.isInternational : !city.isInternational);
+  const selectedCities = cities.filter((city) => {
+    const inScope = query.scope === "international" ? city.isInternational : !city.isInternational;
+    const supportsMode = city.transportModes?.includes(type);
+    return inScope && supportsMode;
+  });
   const fromCities = selectedCities.filter((city) => city.name !== query.to);
   const toCities = selectedCities.filter((city) => city.name !== query.from);
   const canSearch = query.from && query.to && query.from !== query.to && query.date && (type === "flight" ? true : query.scope === "domestic");
@@ -499,12 +503,8 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout }) {
   const { query } = activeJourney;
   const route = liveRoute || activeJourney.route;
 
-  const boardingPointOptions = livePoints?.boardingPoints?.length
-    ? livePoints.boardingPoints
-    : [`${route.origin} Central`, `${route.origin} Circle`, `${route.origin} Bus Terminal`, `${route.origin} Highway Pickup`].map((name, index) => ({ id: index + 1, name }));
-  const droppingPointOptions = livePoints?.droppingPoints?.length
-    ? livePoints.droppingPoints
-    : [`${route.destination} Central`, `${route.destination} Market`, `${route.destination} Bus Terminal`, `${route.destination} City Drop`].map((name, index) => ({ id: index + 1, name }));
+  const boardingPointOptions = livePoints?.boardingPoints?.length ? livePoints.boardingPoints : [];
+  const droppingPointOptions = livePoints?.droppingPoints?.length ? livePoints.droppingPoints : [];
   const boardingPoints = boardingPointOptions.map((point) => point.name);
   const droppingPoints = droppingPointOptions.map((point) => point.name);
   const seats = selectedSeats.length ? selectedSeats : passengers.map((_, index) => `AUTO-${index + 1}`);
@@ -545,6 +545,9 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   const isSleeper = layoutType.includes("sleeper");
   const isMixed = layoutType.includes("mixed") || layoutType.includes("sleeper-seater");
   const seats = route.seatLayout?.seats || [];
+  if (route.externalProvider === "bdsd" && !seats.length) {
+    return <div className="empty-results">Live BDSD seat layout is not available for this bus yet.</div>;
+  }
   const seatsPerRow = isSleeper || isMixed ? 3 : 4;
   const rowsPerDeck = isSleeper || isMixed ? 10 : 11;
   
@@ -1086,6 +1089,10 @@ function LoginInline({ setUser }) {
 
 function SeatMap({ route, selected, setSelected }) {
   const unavailable = new Set(route.seatLayout?.unavailable || []);
+  const seats = route.seatLayout?.seats || [];
+  if (route.externalProvider === "bdsd" && !seats.length) {
+    return <div className="empty-results">Live BDSD seat layout is not available for this bus yet.</div>;
+  }
   const toggle = (id) => {
     if (unavailable.has(id)) return;
     setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
@@ -1093,7 +1100,7 @@ function SeatMap({ route, selected, setSelected }) {
   return (
     <div className="seat-landscape">
       <div className={`seat-map ${route.type}`}>
-        {(route.seatLayout?.seats || []).map((seat) => {
+        {seats.map((seat) => {
           // Skip rendering walkway seats in landscape view
           if (seat.isWalkway) {
             return <div key={seat.id} className="seat-walkway-landscape" />;
