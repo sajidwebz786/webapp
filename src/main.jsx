@@ -214,6 +214,7 @@ function App() {
   const [pendingRoute, setPendingRoute] = useState(null);
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [activeJourney, setActiveJourney] = useState(null);
+  const [authReturnPage, setAuthReturnPage] = useState(null);
 
   const refreshBookings = () => user && api("/bookings/mine").then(setBookings).catch(() => {});
 
@@ -260,12 +261,12 @@ function App() {
       {page === "bus" && <HomePage cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} packages={packages} pendingRoute={pendingRoute} setPendingRoute={setPendingRoute} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />}
       {page === "flight" && <ServicePage type="flight" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />}
       {page === "train" && <ServicePage type="train" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />}
-      {page === "hotels" && <HotelsPage hotels={hotels} user={user} refreshBookings={refreshBookings} />}
+      {page === "hotels" && <HotelsPage hotels={hotels} setPage={setPage} setPendingCheckout={setPendingCheckout} />}
       {page === "packages" && <PackagesPage packages={packages} user={user} refreshBookings={refreshBookings} />}
       {page === "dashboard" && <DashboardPage user={user} setUser={setUser} setPage={setPage} bookings={bookings} refreshBookings={refreshBookings} />}
       {page === "support" && <SupportPage user={user} bookings={bookings} />}
-      {page === "auth" && <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={pendingCheckout} />}
-      {page === "booking" && <BookingPage activeJourney={activeJourney} setPage={setPage} user={user} setPendingCheckout={setPendingCheckout} />}
+      {page === "auth" && <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={pendingCheckout} authReturnPage={authReturnPage} setAuthReturnPage={setAuthReturnPage} />}
+      {page === "booking" && <BookingPage activeJourney={activeJourney} setPage={setPage} user={user} setPendingCheckout={setPendingCheckout} setAuthReturnPage={setAuthReturnPage} />}
       {page === "checkout" && <CheckoutPage user={user} setPage={setPage} pendingCheckout={pendingCheckout} setPendingCheckout={setPendingCheckout} refreshBookings={refreshBookings} />}
       {!immersiveBooking && <FloatingAssistant user={user} bookings={bookings} />}
       {!immersiveBooking && <Footer setPage={setPage} />}
@@ -469,7 +470,7 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   );
 }
 
-function BookingPage({ activeJourney, setPage, user, setPendingCheckout }) {
+function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuthReturnPage }) {
   const [step, setStep] = useState("points");
   const [liveRoute, setLiveRoute] = useState(null);
   const [livePoints, setLivePoints] = useState(null);
@@ -490,6 +491,10 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout }) {
     if (!selectedRoute?.id) return;
     setLiveRoute(selectedRoute);
     setLivePoints(null);
+    if (selectedRoute.type !== "bus") {
+      setStep("passenger");
+      return;
+    }
     api(`/transport/${selectedRoute.type}/${selectedRoute.id}/seats`).then((seatLayout) => {
       setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout }));
     }).catch(() => {});
@@ -502,14 +507,24 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout }) {
 
   const { query } = activeJourney;
   const route = liveRoute || activeJourney.route;
+  const isBus = route.type === "bus";
 
   const boardingPointOptions = livePoints?.boardingPoints?.length ? livePoints.boardingPoints : [];
   const droppingPointOptions = livePoints?.droppingPoints?.length ? livePoints.droppingPoints : [];
   const boardingPoints = boardingPointOptions.map((point) => point.name);
   const droppingPoints = droppingPointOptions.map((point) => point.name);
-  const seats = selectedSeats.length ? selectedSeats : passengers.map((_, index) => `AUTO-${index + 1}`);
-  const total = Number(route.price) * Math.max(seats.length, passengers.length);
+  const seats = isBus ? selectedSeats : [];
+  const total = Number(route.price) * Math.max(isBus ? seats.length : passengers.length, 1);
   const canContinue = step === "points" ? boardingPoint && dropPoint : step === "seats" ? selectedSeats.length > 0 : true;
+
+  const goPassenger = () => {
+    if (!user) {
+      setAuthReturnPage("booking");
+      setPage("auth");
+      return;
+    }
+    setStep("passenger");
+  };
 
   const buy = () => {
     const selectedBoarding = boardingPointOptions.find((point) => point.name === boardingPoint);
@@ -526,14 +541,14 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout }) {
         <div className="window-offer">Last min. 10% OFF</div>
       </div>
       <div className="wizard-tabs booking-tabs">
-        {["points", "seats", "passenger"].map((item, index) => <button key={item} className={step === item ? "active" : ""} onClick={() => setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
+        {(isBus ? ["points", "seats", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} onClick={() => item === "passenger" && !user ? (setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
       </div>
-      {step === "points" && <BoardDropStep boardingPoints={boardingPoints} droppingPoints={droppingPoints} boardingPoint={boardingPoint} setBoardingPoint={setBoardingPoint} dropPoint={dropPoint} setDropPoint={setDropPoint} />}
-      {step === "seats" && <div className="dedicated-seat-screen"><PortraitSeatChart route={route} selected={selectedSeats} setSelected={setSelectedSeats} /><BusProfilePanel route={route} /></div>}
-      {step === "passenger" && <div className="passenger-screen"><div><PassengerForm query={query} selectedSeats={selectedSeats} passengers={passengers} setPassengers={setPassengers} contact={contact} setContact={setContact} /><p className="identity-note">The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding.</p></div><FareSummary total={total} route={route} boardingPoint={boardingPoint} dropPoint={dropPoint} seats={seats} /></div>}
+      {isBus && step === "points" && <BoardDropStep boardingPoints={boardingPoints} droppingPoints={droppingPoints} boardingPoint={boardingPoint} setBoardingPoint={setBoardingPoint} dropPoint={dropPoint} setDropPoint={setDropPoint} />}
+      {isBus && step === "seats" && <div className="dedicated-seat-screen"><PortraitSeatChart route={route} selected={selectedSeats} setSelected={setSelectedSeats} /><BusProfilePanel route={route} /></div>}
+      {step === "passenger" && <div className="passenger-screen"><div><PassengerForm query={query} selectedSeats={selectedSeats} passengers={passengers} setPassengers={setPassengers} contact={contact} setContact={setContact} mode={route.type} /><p className="identity-note">{isBus ? "The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding." : "Traveller name and contact details should match the government ID used during travel."}</p></div><FareSummary total={total} route={route} boardingPoint={boardingPoint} dropPoint={dropPoint} seats={seats} /></div>}
       <div className="booking-bottom-bar">
         <div><span>Amount to pay</span><strong>₹{Number(total).toLocaleString("en-IN")}</strong></div>
-        {step !== "passenger" ? <button className="primary" disabled={!canContinue} onClick={() => setStep(step === "points" ? "seats" : "passenger")}>Continue</button> : <button className="primary" onClick={buy}>Buy ticket</button>}
+        {step !== "passenger" ? <button className="primary" disabled={!canContinue} onClick={() => step === "points" ? setStep("seats") : goPassenger()}>Continue</button> : <button className="primary" onClick={buy}>{isBus ? "Buy ticket" : "Review booking"}</button>}
       </div>
     </section>
   );
@@ -548,28 +563,9 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   if (route.externalProvider === "bdsd" && !seats.length) {
     return <div className="empty-results">Live BDSD seat layout is not available for this bus yet.</div>;
   }
-  const seatsPerRow = isSleeper || isMixed ? 3 : 4;
-  const rowsPerDeck = isSleeper || isMixed ? 10 : 11;
-  
-  const lower = completeDeckSeats(
-    isSleeper || isMixed
-      ? seats.filter((seat) => seat.deck === "lower" && !seat.isWalkway)
-      : seats.filter((seat) => !seat.isWalkway),
-    "L",
-    seatsPerRow,
-    rowsPerDeck,
-    route.price
-  );
-  
-  const upper = completeDeckSeats(
-    isSleeper || isMixed
-      ? seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway)
-      : [],
-    "U",
-    seatsPerRow,
-    rowsPerDeck,
-    route.price
-  );
+  const lower = buildDeckLayout(seats.filter((seat) => (isSleeper || isMixed ? seat.deck !== "upper" : true) && !seat.isWalkway), isSleeper || isMixed);
+  const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
+  const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);
 
   const toggle = (id) => {
     if (unavailable.has(id)) return;
@@ -578,41 +574,39 @@ function PortraitSeatChart({ route, selected, setSelected }) {
 
   return (
     <div className="portrait-chart-wrap">
-      <Deck title="Lower deck" seats={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />
-      {(isSleeper || isMixed) && <Deck title="Upper deck" seats={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
+      <Deck title="Lower deck" layout={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />
+      {(isSleeper || isMixed) && upperSeats.length > 0 && <Deck title="Upper deck" layout={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
       <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="female-seat">Women</span><span className="sold-seat">Sold</span></div>
     </div>
   );
 }
 
-function completeDeckSeats(seats, prefix, seatsPerRow, rowsPerDeck, baseFare) {
-  const minimum = seatsPerRow * rowsPerDeck;
-  const roundedRealCount = Math.ceil(Math.max(seats.length, minimum) / seatsPerRow) * seatsPerRow;
-  const targetCount = Math.max(minimum, roundedRealCount);
-  const existing = new Set(seats.map((seat) => seat.id));
-  const completed = [...seats];
-  for (let index = seats.length; index < targetCount; index += 1) {
-    let id = `${prefix}${index + 1}`;
-    while (existing.has(id)) id = `${prefix}${index + 1}-${existing.size}`;
-    existing.add(id);
-    completed.push({
-      id,
-      fareMultiplier: index % 5 === 0 ? 1.1 : index % 4 === 0 ? 0.92 : 1,
-      generated: true,
-      baseFare,
-    });
-  }
-  return completed;
+function buildDeckLayout(seats, berthLike) {
+  const fallbackCols = berthLike ? [1, 3, 4] : [1, 2, 4, 5];
+  const prepared = seats.map((seat, index) => {
+    const hasCoordinates = Number.isFinite(Number(seat.row)) && Number.isFinite(Number(seat.column));
+    const fallbackRow = Math.floor(index / fallbackCols.length) + 1;
+    const fallbackColumn = fallbackCols[index % fallbackCols.length];
+    return {
+      ...seat,
+      row: hasCoordinates ? Number(seat.row) + 1 : fallbackRow,
+      column: hasCoordinates ? Number(seat.column) + 1 : fallbackColumn,
+      width: Math.max(1, Number(seat.width || 1)),
+      height: Math.max(1, Number(seat.height || (seat.isBerth ? 2 : 1)))
+    };
+  });
+  const maxColumn = Math.max(5, ...prepared.map((seat) => seat.column + seat.width - 1));
+  const rows = [...new Set(prepared.map((seat) => seat.row))].sort((a, b) => a - b);
+  return { seats: prepared.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
 }
 
-function Deck({ title, seats, unavailable, selected, toggle, sleeper, mixed, baseFare }) {
-  const isSleeperLayout = sleeper || mixed;
-
+function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, baseFare }) {
   const renderSeat = (seat, index) => {
     const sold = unavailable.has(seat.id);
     const chosen = selected.includes(seat.id);
-    const women = index % 7 === 2;
-    const berth = sleeper || mixed;
+    const women = seat.ladies || index % 7 === 2;
+    const berth = Boolean(seat.isBerth || sleeper || (mixed && Number(seat.height || 1) > 1));
+    const fare = Number(seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
 
     return (
       <button
@@ -620,42 +614,24 @@ function Deck({ title, seats, unavailable, selected, toggle, sleeper, mixed, bas
         className={`${berth ? "sleeper-berth" : "chair-seat"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
         onClick={() => toggle(seat.id)}
         aria-label={`${title} seat ${seat.id}`}
+        style={{ gridColumn: `${seat.column} / span ${seat.width || 1}`, gridRow: `${seat.row} / span ${seat.height || 1}` }}
       >
+        <b>{seat.label || seat.id}</b>
         {berth ? <span className="pillow" /> : <Armchair size={17} />}
-        <small>{sold ? "Sold" : `₹${Math.round(Number(baseFare) * (seat.fareMultiplier || 1))}`}</small>
+        <small>{sold ? "Sold" : `₹${fare}`}</small>
       </button>
     );
   };
 
-  if (!isSleeperLayout) {
-    return (
-      <article className="deck-card">
-        <div className="deck-head"><h3>{title}</h3><span>☸</span></div>
-        <div className="portrait-seat-grid seater-grid">
-          {seats.map(renderSeat)}
-        </div>
-      </article>
-    );
-  }
-
-  const rows = [];
-  for (let i = 0; i < seats.length; i += 3) {
-    rows.push(seats.slice(i, i + 3));
-  }
-
-  const rowElements = rows.flatMap((row, rowIndex) => [
-    row[0] ? renderSeat(row[0], rowIndex * 3) : <div key={`left-empty-${rowIndex}`} />,
-    <div key={`walkway-${rowIndex}`} className="walkway" />,
-    row[1] ? renderSeat(row[1], rowIndex * 3 + 1) : <div key={`middle-empty-${rowIndex}`} />,
-    row[2] ? renderSeat(row[2], rowIndex * 3 + 2) : <div key={`right-empty-${rowIndex}`} />,
-  ]);
-
   return (
     <article className="deck-card">
-      <div className="deck-head"><h3>{title}</h3><span>☸</span></div>
-      <div className="portrait-seat-grid sleeper-grid">
-        {rowElements}
+      <div className="deck-head"><h3>{title}</h3><span>Driver</span></div>
+      <div className="bus-front-marker"><i /> <b>FRONT OF VEHICLE</b></div>
+      <div className="vehicle-icons"><span>WC</span><span>Door</span></div>
+      <div className="portrait-seat-grid live-seat-grid" style={{ gridTemplateColumns: `repeat(${layout.columns}, 46px)` }}>
+        {layout.seats.map(renderSeat)}
       </div>
+      <div className="rear-marker">REAR</div>
     </article>
   );
 }
@@ -822,7 +798,8 @@ function SeatDetailsStep({ route, selectedSeats, setSelectedSeats }) {
 }
 
 function FareSummary({ total, route, boardingPoint, dropPoint, seats }) {
-  return <div className="fare-summary"><h3>Fare summary</h3><div><span>Base fare</span><b>₹{Number(route.price).toLocaleString("en-IN")} × {seats.length}</b></div><div><span>Seats</span><b>{seats.join(", ")}</b></div><div><span>Boarding</span><b>{boardingPoint || "Select point"}</b></div><div><span>Dropping</span><b>{dropPoint || "Select point"}</b></div><div className="fare-total"><span>Amount to pay</span><strong>₹{Number(total).toLocaleString("en-IN")}</strong></div></div>;
+  const isBus = route.type === "bus";
+  return <div className="fare-summary"><h3>Fare summary</h3><div><span>{isBus ? "Base fare" : "Fare"}</span><b>₹{Number(route.price).toLocaleString("en-IN")}{isBus ? ` × ${seats.length}` : ""}</b></div>{isBus ? <><div><span>Seats</span><b>{seats.join(", ")}</b></div><div><span>Boarding</span><b>{boardingPoint || "Select point"}</b></div><div><span>Dropping</span><b>{dropPoint || "Select point"}</b></div></> : <><div><span>From</span><b>{route.origin}</b></div><div><span>To</span><b>{route.destination}</b></div><div><span>Class</span><b>{route.classType || "Economy"}</b></div></>}<div className="fare-total"><span>Amount to pay</span><strong>₹{Number(total).toLocaleString("en-IN")}</strong></div></div>;
 }
 
 function JourneyResults({ type, results, query, onViewSeats }) {
@@ -1117,11 +1094,11 @@ function SeatMap({ route, selected, setSelected }) {
   );
 }
 
-function PassengerForm({ query, selectedSeats, passengers, setPassengers, contact, setContact }) {
+function PassengerForm({ query, selectedSeats, passengers, setPassengers, contact, setContact, mode = "bus" }) {
   useEffect(() => {
-    const count = Math.max(query.travellers, selectedSeats.length || 1);
+    const count = Math.max(query.travellers || 1, mode === "bus" ? selectedSeats.length || 1 : 1);
     setPassengers((current) => Array.from({ length: count }, (_, index) => current[index] || { ...initialPassenger, seat: selectedSeats[index] || "" }));
-  }, [query.travellers, selectedSeats.join(",")]);
+  }, [query.travellers, selectedSeats.join(","), mode]);
 
   return (
     <div className="traveller-form">
@@ -1131,7 +1108,7 @@ function PassengerForm({ query, selectedSeats, passengers, setPassengers, contac
           <input placeholder="Passenger name" value={passenger.name} onChange={(e) => setPassengers(passengers.map((p, i) => i === index ? { ...p, name: e.target.value } : p))} />
           <input placeholder="Age" type="number" value={passenger.age} onChange={(e) => setPassengers(passengers.map((p, i) => i === index ? { ...p, age: e.target.value } : p))} />
           <select value={passenger.gender} onChange={(e) => setPassengers(passengers.map((p, i) => i === index ? { ...p, gender: e.target.value } : p))}><option>Male</option><option>Female</option><option>Other</option></select>
-          <input placeholder="Seat" value={selectedSeats[index] || passenger.seat} readOnly />
+          {mode === "bus" ? <input placeholder="Seat" value={selectedSeats[index] || passenger.seat} readOnly /> : <input placeholder="Class" value={mode === "flight" ? "Economy" : "Traveller"} readOnly />}
         </div>
       ))}
       <div className="contact-grid"><input placeholder="Contact email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /><input placeholder="Mobile number" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} /><input placeholder="Emergency contact" value={contact.emergencyPhone} onChange={(e) => setContact({ ...contact, emergencyPhone: e.target.value })} /></div>
@@ -1191,15 +1168,36 @@ function Testimonials() {
   );
 }
 
-function HotelsPage({ hotels, user, refreshBookings }) {
-  return <section className="page-band"><div className="page-heading"><Hotel size={34} /><div><h1>Hotels</h1><p>Handpicked stays for holidays, business trips and family travel.</p></div></div><div className="card-grid">{hotels.map((hotel) => <article className="travel-card" key={hotel.id}><img src={hotel.imageUrl} alt={hotel.name} /><div><span>{hotel.starRating} star · {hotel.city}</span><h3>{hotel.name}</h3><p>{hotel.amenities?.join(" · ")}</p></div><footer><b>₹{Number(hotel.pricePerNight).toLocaleString("en-IN")}/night</b><button>Book</button></footer></article>)}</div></section>;
+function HotelsPage({ hotels, setPage, setPendingCheckout }) {
+  const bookHotel = (hotel) => {
+    const checkInDate = toDateInputValue(daysFromNow(1));
+    const checkOutDate = toDateInputValue(daysFromNow(2));
+    setPendingCheckout({
+      route: {
+        ...hotel,
+        type: "hotel",
+        providerName: hotel.name,
+        origin: hotel.city,
+        destination: hotel.city,
+        price: hotel.pricePerNight
+      },
+      query: { date: checkInDate, checkInDate, checkOutDate, nights: 1, rooms: 1, travellers: 2 },
+      selectedSeats: [],
+      passengers: [{ ...initialPassenger }],
+      contact: { email: "", phone: "", emergencyPhone: "" },
+      totalAmount: Number(hotel.pricePerNight || 0)
+    });
+    setPage("auth");
+  };
+
+  return <section className="page-band"><div className="page-heading"><Hotel size={34} /><div><h1>Hotels</h1><p>Live BDSD stays for holidays, business trips and family travel.</p></div></div><div className="card-grid">{hotels.map((hotel) => <article className="travel-card" key={hotel.id || hotel.externalHotelCode || hotel.name}><img src={hotel.imageUrl} alt={hotel.name} /><div><span>{hotel.starRating} star · {hotel.city}</span><h3>{hotel.name}</h3><p>{hotel.amenities?.join(" · ")}</p></div><footer><b>₹{Number(hotel.pricePerNight).toLocaleString("en-IN")}/night</b><button onClick={() => bookHotel(hotel)}>Book room</button></footer></article>)}</div>{!hotels.length && <div className="empty-results">No live BDSD hotels are available for the configured city/date right now.</div>}</section>;
 }
 
 function PackagesPage({ packages }) {
   return <section className="page-band"><div className="page-heading"><BriefcaseBusiness size={34} /><div><h1>Curated Packages</h1><p>Family tours, luxury getaways, honeymoon escapes and seasonal plans.</p></div></div><div className="card-grid">{packages.map((pkg) => <article className="travel-card" key={pkg.id}><img src={pkg.imageUrl} alt={pkg.title} /><div><span>{pkg.category}</span><h3>{pkg.title}</h3><p>{pkg.durationDays} days · {pkg.inclusions?.join(" · ")}</p></div><footer><b>₹{Number(pkg.price).toLocaleString("en-IN")}</b><button>Enquire</button></footer></article>)}</div></section>;
 }
 
-function AuthPage({ user, setUser, setPage, pendingCheckout }) {
+function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, setAuthReturnPage }) {
   const resetTokenFromUrl = new URLSearchParams(window.location.search).get("resetToken") || "";
   const [mode, setMode] = useState(resetTokenFromUrl ? "reset" : "login");
   const [form, setForm] = useState({ name: "", email: "customer@orbitatravels.com", phone: "", password: "customer123" });
@@ -1236,7 +1234,8 @@ function AuthPage({ user, setUser, setPage, pendingCheckout }) {
       });
       tokenStore.set(data.token);
       setUser(data.user);
-      setPage(pendingCheckout ? "checkout" : "dashboard");
+      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
+      setAuthReturnPage?.(null);
     } catch (error) {
       setMessage(error.message);
     }
@@ -1248,7 +1247,8 @@ function AuthPage({ user, setUser, setPage, pendingCheckout }) {
       const data = await api(`/auth/${mode}`, { method: "POST", body: JSON.stringify(form) });
       tokenStore.set(data.token);
       setUser(data.user);
-      setPage(pendingCheckout ? "checkout" : "dashboard");
+      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
+      setAuthReturnPage?.(null);
     } catch (error) {
       setMessage(error.message);
     }
@@ -1271,14 +1271,15 @@ function AuthPage({ user, setUser, setPage, pendingCheckout }) {
       tokenStore.set(data.token);
       setUser(data.user);
       window.history.replaceState({}, "", "/");
-      setPage(pendingCheckout ? "checkout" : "dashboard");
+      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
+      setAuthReturnPage?.(null);
     } catch (error) {
       setMessage(error.message);
     }
   };
 
   if (user) {
-    return <section className="page-band account-page"><div className="page-heading"><UserRound size={34} /><div><h1>You are logged in</h1><p>Continue to your dashboard or complete the selected booking.</p></div></div><button className="primary" onClick={() => setPage(pendingCheckout ? "checkout" : "dashboard")}>Continue</button></section>;
+    return <section className="page-band account-page"><div className="page-heading"><UserRound size={34} /><div><h1>You are logged in</h1><p>Continue to your dashboard or complete the selected booking.</p></div></div><button className="primary" onClick={() => { setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard")); setAuthReturnPage?.(null); }}>Continue</button></section>;
   }
 
   return (
@@ -1336,20 +1337,33 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
 
   const purchase = async () => {
     const draft = pendingCheckout;
+    const draftType = draft.route.type || draft.type || "bus";
     setPurchasing(true);
     setMessage("");
     try {
       const booking = await api("/bookings", {
         method: "POST",
         body: JSON.stringify({
-          type: draft.route.type,
+          type: draftType,
           itemId: draft.route.id,
           travelDate: draft.query.date,
-          selectedSeats: draft.selectedSeats,
-          passengers: draft.passengers.map((passenger, index) => ({ ...passenger, seat: draft.selectedSeats[index] })),
+          selectedSeats: draft.selectedSeats || [],
+          passengers: (draft.passengers || []).map((passenger, index) => ({ ...passenger, seat: draft.selectedSeats?.[index] || "" })),
           contact: draft.contact,
           totalAmount: draft.totalAmount,
-          metadata: { origin: draft.route.origin, destination: draft.route.destination, tripType: draft.query.tripType, returnDate: draft.query.returnDate, boardingPoint: draft.boardingPoint, dropPoint: draft.dropPoint, boardingPointId: draft.boardingPointId, dropPointId: draft.dropPointId }
+          metadata: {
+            origin: draft.route.origin,
+            destination: draft.route.destination,
+            tripType: draft.query.tripType,
+            returnDate: draft.query.returnDate,
+            checkInDate: draft.query.checkInDate,
+            checkOutDate: draft.query.checkOutDate,
+            rooms: draft.query.rooms,
+            boardingPoint: draft.boardingPoint,
+            dropPoint: draft.dropPoint,
+            boardingPointId: draft.boardingPointId,
+            dropPointId: draft.dropPointId
+          }
         })
       });
       setConfirmed(booking);
@@ -1363,18 +1377,28 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
   };
 
   const draft = pendingCheckout;
+  const draftType = draft.route.type || draft.type || "bus";
+  const isBus = draftType === "bus";
+  const isHotel = draftType === "hotel";
+  const routeLine = isHotel ? `${draft.route.name || draft.route.providerName} · ${draft.route.city || draft.route.origin}` : `${draft.route.origin} to ${draft.route.destination} · ${draft.query.date}`;
   return (
     <section className="page-band checkout-page">
-      <div className="page-heading"><CalendarDays size={34} /><div><h1>{confirmed ? "Booking successful" : "Review your ticket"}</h1><p>{confirmed ? "Your printable Orbita Travels ticket is ready." : "Confirm traveller details before purchasing the ticket."}</p></div></div>
+      <div className="page-heading"><CalendarDays size={34} /><div><h1>{confirmed ? "Booking successful" : isHotel ? "Review your stay" : "Review your ticket"}</h1><p>{confirmed ? "Your printable Orbita Travels booking is ready." : "Confirm traveller details before purchasing."}</p></div></div>
       <article className="print-ticket">
         <div className="ticket-head"><Logo /><strong>{confirmed?.bookingCode || "PNR will be generated after purchase"}</strong></div>
         <h2>{draft.route.providerName}</h2>
-        <p>{draft.route.origin} to {draft.route.destination} · {draft.query.date}</p>
-        <div className="ticket-grid"><span>Boarding point<b>{draft.boardingPoint || "Not selected"}</b></span><span>Dropping point<b>{draft.dropPoint || "Not selected"}</b></span><span>Seats<b>{draft.selectedSeats.join(", ")}</b></span><span>Amount<b>₹{Number(draft.totalAmount).toLocaleString("en-IN")}</b></span></div>
-        <h3>Passengers</h3>
-        {draft.passengers.map((passenger, index) => <div className="ticket-passenger" key={index}><span>{passenger.name || `Passenger ${index + 1}`}</span><span>{passenger.age || "-"} yrs</span><span>{passenger.gender}</span><b>{draft.selectedSeats[index]}</b></div>)}
-        <p className="identity-note">The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding.</p>
-        {!confirmed ? <button className="primary" onClick={purchase} disabled={purchasing}>{purchasing ? "Processing..." : "Purchase ticket"}</button> : <><button className="primary" onClick={() => window.print()}>Print ticket</button><button className="secondary-action" onClick={() => setPage("dashboard")}>Back to dashboard</button></>}
+        <p>{routeLine}</p>
+        {isBus ? (
+          <div className="ticket-grid"><span>Boarding point<b>{draft.boardingPoint || "Not selected"}</b></span><span>Dropping point<b>{draft.dropPoint || "Not selected"}</b></span><span>Seats<b>{draft.selectedSeats.join(", ")}</b></span><span>Amount<b>₹{Number(draft.totalAmount).toLocaleString("en-IN")}</b></span></div>
+        ) : isHotel ? (
+          <div className="ticket-grid"><span>Check-in<b>{draft.query.checkInDate}</b></span><span>Check-out<b>{draft.query.checkOutDate}</b></span><span>Rooms<b>{draft.query.rooms || 1}</b></span><span>Amount<b>₹{Number(draft.totalAmount).toLocaleString("en-IN")}</b></span></div>
+        ) : (
+          <div className="ticket-grid"><span>From<b>{draft.route.origin}</b></span><span>To<b>{draft.route.destination}</b></span><span>Class<b>{draft.route.classType || "Economy"}</b></span><span>Amount<b>₹{Number(draft.totalAmount).toLocaleString("en-IN")}</b></span></div>
+        )}
+        <h3>{isHotel ? "Guest details" : "Passengers"}</h3>
+        {(draft.passengers || []).map((passenger, index) => <div className="ticket-passenger" key={index}><span>{passenger.name || `${isHotel ? "Guest" : "Passenger"} ${index + 1}`}</span><span>{passenger.age || "-"} yrs</span><span>{passenger.gender}</span><b>{isBus ? draft.selectedSeats[index] : draft.route.classType || draft.query.rooms || "-"}</b></div>)}
+        <p className="identity-note">{isBus ? "The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding." : "Please carry a valid government-issued ID matching the traveller or guest details."}</p>
+        {!confirmed ? <button className="primary" onClick={purchase} disabled={purchasing}>{purchasing ? "Processing..." : isHotel ? "Book room" : "Purchase ticket"}</button> : <><button className="primary" onClick={() => window.print()}>Print booking</button><button className="secondary-action" onClick={() => setPage("dashboard")}>Back to dashboard</button></>}
         {message && <div className="success-note">{confirmed ? <span>Booking confirmed with PNR <strong>{confirmed.bookingCode}</strong>. {message}</span> : <span>{message}</span>}</div>}
       </article>
     </section>
