@@ -583,18 +583,25 @@ function PortraitSeatChart({ route, selected, setSelected }) {
 
 function buildDeckLayout(seats, berthLike) {
   const fallbackCols = berthLike ? [1, 3, 4] : [1, 2, 4, 5];
-  const prepared = seats.map((seat, index) => {
+  const raw = seats.map((seat, index) => {
     const hasCoordinates = Number.isFinite(Number(seat.row)) && Number.isFinite(Number(seat.column));
     const fallbackRow = Math.floor(index / fallbackCols.length) + 1;
     const fallbackColumn = fallbackCols[index % fallbackCols.length];
     return {
       ...seat,
-      row: hasCoordinates ? Number(seat.row) + 1 : fallbackRow,
-      column: hasCoordinates ? Number(seat.column) + 1 : fallbackColumn,
+      row: hasCoordinates ? Number(seat.row) : fallbackRow,
+      column: hasCoordinates ? Number(seat.column) : fallbackColumn,
       width: Math.max(1, Number(seat.width || 1)),
       height: Math.max(1, Number(seat.height || (seat.isBerth ? 2 : 1)))
     };
   });
+  const minRow = Math.min(...raw.map((seat) => seat.row));
+  const minColumn = Math.min(...raw.map((seat) => seat.column));
+  const prepared = raw.map((seat) => ({
+    ...seat,
+    row: seat.row + (minRow === 0 ? 1 : 0),
+    column: seat.column + (minColumn === 0 ? 1 : 0)
+  }));
   const maxColumn = Math.max(5, ...prepared.map((seat) => seat.column + seat.width - 1));
   const rows = [...new Set(prepared.map((seat) => seat.row))].sort((a, b) => a - b);
   return { seats: prepared.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
@@ -1030,13 +1037,13 @@ function JourneyResults({ type, results, query, onViewSeats }) {
                 {route.externalProvider === "bdsd" && <span className="provider-source-badge">BDSD live API</span>}
                 <div className="result-card-meta">
                   <span>{route.vehicleType} · {route.classType}</span>
-                  {seatsLeft > 0 && <span className="seats-left"><Armchair size={14} /> {seatsLeft} seats left</span>}
+                  {type === "bus" && seatsLeft > 0 && <span className="seats-left"><Armchair size={14} /> {seatsLeft} seats left</span>}
                 </div>
                 <div className="time-row"><b>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b><span>{route.origin} to {route.destination}</span><b>{new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b></div>
                 <div className="amenities">{route.amenities?.map((item) => <span key={item}>{item}</span>)}</div>
                 <div className="fare-row">
                   <div><small>From</small><strong>₹{Number(route.price).toLocaleString("en-IN")}</strong></div>
-                  <button onClick={() => onViewSeats(route)}>Select Seats</button>
+                  <button onClick={() => onViewSeats(route)}>{type === "bus" ? "Select Seats" : type === "flight" ? "Book Flight" : "Book Train"}</button>
                 </div>
               </article>
             );

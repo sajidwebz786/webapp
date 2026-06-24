@@ -243,28 +243,35 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .window-offer { border-radius: 8px; padding: 10px 14px; background: #ffdb82; color: #111827; font-weight: 850; text-align: center; }
 .booking-tabs { position: sticky; top: 82px; z-index: 13; margin: 0; }
 .dedicated-seat-screen { width: calc(100% - 24px); max-width: 1180px; margin: 18px auto; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(350px, 0.85fr); gap: 16px; align-items: start; min-width: 0; }
-.portrait-chart-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; }
-.deck-card { background: white; border-radius: 16px; padding: 12px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; }
+.portrait-chart-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; min-width: 0; }
+.deck-card { background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 24px 18px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; overflow-x: auto; }
 .deck-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .deck-head h3 { margin: 0; font-size: 15px; }
-.deck-head span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #999; border: 3px solid #bbb; font-size: 15px; }
-.portrait-seat-grid { display: grid; justify-content: center; gap: 7px 9px; max-height: calc(100vh - 245px); overflow-y: auto; padding: 2px 2px 8px; }
+.deck-head span { min-width: 58px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #6f7480; border: 1px solid #c5ccdc; font-size: 11px; font-weight: 850; margin-left: auto; }
+.bus-front-marker { display: grid; justify-items: center; gap: 10px; margin: 4px 0 18px; color: #111827; font-size: 13px; font-weight: 850; letter-spacing: .18em; }
+.bus-front-marker i { display: block; width: 120px; height: 7px; border-radius: 999px; background: #cbe0ff; }
+.vehicle-icons { display: flex; justify-content: space-around; align-items: center; color: #777b88; margin-bottom: 22px; font-size: 12px; font-weight: 850; }
+.vehicle-icons span { min-width: 46px; height: 34px; display: grid; place-items: center; border: 1px solid #d8deea; border-radius: 8px; background: #fbfcff; }
+.portrait-seat-grid { display: grid; justify-content: center; gap: 12px 14px; max-height: none; overflow: visible; padding: 8px 8px 18px; grid-auto-rows: 42px; grid-auto-flow: dense; }
 .seater-grid { grid-template-columns: repeat(4, 36px); }
 .sleeper-grid, .mixed-grid { grid-template-columns: 46px 34px 46px 46px; align-items: start; }
+.live-seat-grid { min-width: max-content; }
 .walkway { width: 34px; height: 66px; background: transparent; border: 0; }
 .walkway::before,
 .walkway::after { content: ""; }
-.chair-seat, .sleeper-berth { position: relative; border: 2px solid #11964d; background: #ffffff; color: #087a3d; border-radius: 8px; display: grid; place-items: center; gap: 3px; box-shadow: 0 5px 12px rgba(16, 150, 77, .08); transition: transform .16s ease, box-shadow .16s ease, background .16s ease; }
-.chair-seat { width: 36px; height: 38px; }
-.sleeper-berth { width: 46px; height: 104px; }
-.chair-seat small, .sleeper-berth small { font-size: 9px; color: #5d6778; }
+.chair-seat, .sleeper-berth { position: relative; border: 1.5px solid #aeb7cb; background: #ffffff; color: #111827; border-radius: 9px; display: grid; place-items: center; gap: 2px; box-shadow: 0 5px 12px rgba(20, 36, 65, .05); transition: transform .16s ease, box-shadow .16s ease, background .16s ease; }
+.chair-seat { width: 46px; height: 42px; }
+.sleeper-berth { width: 46px; height: 96px; }
+.chair-seat b, .sleeper-berth b { font-size: 12px; line-height: 1; }
+.chair-seat small, .sleeper-berth small { font-size: 8px; color: #6b7280; }
 .pillow { width: 25px; height: 7px; border-radius: 999px; background: #d4f0df; position: absolute; bottom: 8px; }
-.chair-seat:hover, .sleeper-berth:hover { transform: translateY(-2px); box-shadow: 0 10px 18px rgba(16, 150, 77, .16); }
-.chair-seat.chosen, .sleeper-berth.chosen { background: linear-gradient(135deg, #e31b37, #0757c8); border-color: #0757c8; color: white; }
+.chair-seat:hover, .sleeper-berth:hover { transform: translateY(-2px); box-shadow: 0 10px 18px rgba(20, 36, 65, .12); }
+.chair-seat.chosen, .sleeper-berth.chosen { background: var(--blue-dark); border-color: var(--blue-dark); color: white; }
 .chair-seat.chosen small, .sleeper-berth.chosen small { color: white; }
 .chair-seat.women, .sleeper-berth.women { border-color: #ff51a8; background: #fff1f8; color: #df2682; }
 .chair-seat.sold, .sleeper-berth.sold { border-color: #dedee7; background: #ececf2; color: #b2b4bf; cursor: not-allowed; box-shadow: none; }
 .chair-seat.sold small, .sleeper-berth.sold small { color: #b2b4bf; }
+.rear-marker { margin-top: 22px; padding-top: 18px; border-top: 1px dashed #d8deea; color: #b7bdc8; text-align: center; font-weight: 900; letter-spacing: .22em; }
 .vibrant { grid-column: 1 / -1; background: white; border-radius: 14px; padding: 14px; box-shadow: 0 10px 24px rgba(20, 36, 65, .08); }
 .seat-legend .female-seat:before { background: #fff1f8; border-color: #ff51a8; }
 .bus-profile-panel { background: white; border-radius: 18px; overflow: hidden; box-shadow: 0 14px 30px rgba(20, 36, 65, .09); }
