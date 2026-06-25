@@ -1,4 +1,4 @@
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+export const API_URL = import.meta.env.VITE_API_URL || "https://tt-server-2a68.onrender.com/api";
 
 export const tokenStore = {
   get: () => localStorage.getItem("traveltimes_token"),

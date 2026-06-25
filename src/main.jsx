@@ -1252,7 +1252,8 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
   const oauthLogin = async (provider) => {
     if (provider === "google") {
       setMessage("");
-      window.location.href = `${API_URL}/auth/google`;
+      const params = new URLSearchParams({ returnTo: window.location.origin });
+      window.location.href = `${API_URL}/auth/google?${params}`;
       return;
     }
     try {
