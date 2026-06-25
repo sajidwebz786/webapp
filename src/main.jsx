@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronDown, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
-import { api, tokenStore } from "./services/api";
+import { API_URL, api, tokenStore } from "./services/api";
 import { Logo } from "./components/Logo";
 import apsrtcLogo from "./assets/images/apsrtc-logo.png";
 import ksrtcLogo from "./assets/images/ksrtc-logo.png";
@@ -215,6 +215,7 @@ function App() {
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [activeJourney, setActiveJourney] = useState(null);
   const [authReturnPage, setAuthReturnPage] = useState(null);
+  const [authMessage, setAuthMessage] = useState("");
 
   const refreshBookings = () => user && api("/bookings/mine").then(setBookings).catch(() => {});
 
@@ -227,8 +228,19 @@ function App() {
 
   useEffect(() => {
     const finishGoogleLogin = async () => {
-      if (!window.location.pathname.includes("/auth/google/callback") || !window.location.hash.includes("access_token")) return;
+      if (!window.location.pathname.includes("/auth/google/callback")) return;
       const hash = new URLSearchParams(window.location.hash.slice(1));
+      const appToken = hash.get("token");
+      const error = hash.get("error");
+      if (appToken) {
+        tokenStore.set(appToken);
+        const data = await api("/auth/me");
+        setUser(data.user);
+        window.history.replaceState({}, "", "/");
+        setPage("dashboard");
+        return;
+      }
+      if (error) throw new Error(error);
       const accessToken = hash.get("access_token");
       if (!accessToken) return;
       const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
@@ -249,7 +261,11 @@ function App() {
       window.history.replaceState({}, "", "/");
       setPage("dashboard");
     };
-    finishGoogleLogin().catch(() => setPage("auth"));
+    finishGoogleLogin().catch((error) => {
+      setAuthMessage(error.message || "Google sign-in failed. Please try again.");
+      window.history.replaceState({}, "", "/");
+      setPage("auth");
+    });
   }, []);
 
   useEffect(() => { refreshBookings(); }, [user]);
@@ -265,7 +281,7 @@ function App() {
       {page === "packages" && <PackagesPage packages={packages} user={user} refreshBookings={refreshBookings} />}
       {page === "dashboard" && <DashboardPage user={user} setUser={setUser} setPage={setPage} bookings={bookings} refreshBookings={refreshBookings} />}
       {page === "support" && <SupportPage user={user} bookings={bookings} />}
-      {page === "auth" && <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={pendingCheckout} authReturnPage={authReturnPage} setAuthReturnPage={setAuthReturnPage} />}
+      {page === "auth" && <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={pendingCheckout} authReturnPage={authReturnPage} setAuthReturnPage={setAuthReturnPage} authMessage={authMessage} />}
       {page === "booking" && <BookingPage activeJourney={activeJourney} setPage={setPage} user={user} setPendingCheckout={setPendingCheckout} setAuthReturnPage={setAuthReturnPage} />}
       {page === "checkout" && <CheckoutPage user={user} setPage={setPage} pendingCheckout={pendingCheckout} setPendingCheckout={setPendingCheckout} refreshBookings={refreshBookings} />}
       {!immersiveBooking && <FloatingAssistant user={user} bookings={bookings} />}
@@ -1222,28 +1238,21 @@ function PackagesPage({ packages }) {
   return <section className="page-band"><div className="page-heading"><BriefcaseBusiness size={34} /><div><h1>Curated Packages</h1><p>Family tours, luxury getaways, honeymoon escapes and seasonal plans.</p></div></div><div className="card-grid">{packages.map((pkg) => <article className="travel-card" key={pkg.id}><img src={pkg.imageUrl} alt={pkg.title} /><div><span>{pkg.category}</span><h3>{pkg.title}</h3><p>{pkg.durationDays} days · {pkg.inclusions?.join(" · ")}</p></div><footer><b>₹{Number(pkg.price).toLocaleString("en-IN")}</b><button>Enquire</button></footer></article>)}</div></section>;
 }
 
-function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, setAuthReturnPage }) {
+function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, setAuthReturnPage, authMessage }) {
   const resetTokenFromUrl = new URLSearchParams(window.location.search).get("resetToken") || "";
   const [mode, setMode] = useState(resetTokenFromUrl ? "reset" : "login");
   const [form, setForm] = useState({ name: "", email: "customer@orbitatravels.com", phone: "", password: "customer123" });
   const [resetForm, setResetForm] = useState({ email: "", token: resetTokenFromUrl, password: "" });
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(authMessage || "");
+
+  useEffect(() => {
+    if (authMessage) setMessage(authMessage);
+  }, [authMessage]);
 
   const oauthLogin = async (provider) => {
     if (provider === "google") {
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      if (!clientId) {
-        setMessage("Google sign-in needs VITE_GOOGLE_CLIENT_ID in webapp/.env. Account chooser will open after it is configured.");
-        return;
-      }
-      const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: `${window.location.origin}/auth/google/callback`,
-        response_type: "token",
-        scope: "openid email profile",
-        prompt: "select_account"
-      });
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+      setMessage("");
+      window.location.href = `${API_URL}/auth/google`;
       return;
     }
     try {
