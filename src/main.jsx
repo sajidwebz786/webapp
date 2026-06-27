@@ -645,7 +645,7 @@ function PortraitSeatChart({ route, selected, setSelected }) {
 }
 
 function buildDeckLayout(seats, berthLike) {
-  const fallbackCols = berthLike ? [1, 3, 4] : [1, 2, 4, 5];
+  const fallbackCols = berthLike ? [1, 2, 3] : [1, 2, 3, 4];
   const raw = seats.map((seat, index) => {
     const hasCoordinates = Number.isFinite(Number(seat.row)) && Number.isFinite(Number(seat.column));
     const fallbackRow = Math.floor(index / fallbackCols.length) + 1;
@@ -684,7 +684,9 @@ function buildDeckLayout(seats, berthLike) {
     row: seat.row - orientedMinRow + 1,
     column: seat.column - orientedMinColumn + 1
   }));
-  const maxColumn = Math.max(berthLike ? 4 : 2, ...finalSeats.map((seat) => seat.column + seat.width - 1));
+  const maxColumn = Math.max(
+    ...finalSeats.map(seat => seat.column + (seat.width || 1) - 1)
+);
   const rows = [...new Set(finalSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   return { seats: finalSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
 }
@@ -703,7 +705,14 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
         className={`${berth ? "sleeper-berth" : "chair-seat"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
         onClick={() => toggle(seat.id)}
         aria-label={`${title} seat ${seat.id}`}
-        style={{ gridColumn: `${seat.column} / span ${berth ? seat.width || 1 : 1}`, gridRow: `${seat.row} / span ${berth ? seat.height || 1 : 1}` }}
+        style={{
+    gridColumnStart: seat.column,
+    gridColumnEnd: `span ${seat.width || 1}`,
+    gridRowStart: seat.row,
+    gridRowEnd: `span ${seat.height || 1}`,
+    alignSelf: "stretch",
+    justifySelf: "stretch"
+}}
       >
         <b>{seat.label || seat.id}</b>
         {berth ? <span className="pillow" /> : <Armchair size={17} />}
@@ -717,7 +726,13 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
       <div className="deck-head"><h3>{title}</h3><span>Driver</span></div>
       <div className="bus-front-marker"><i /> <b>FRONT OF VEHICLE</b></div>
       <div className="vehicle-icons"><span>WC</span><span>Door</span></div>
-      <div className="portrait-seat-grid live-seat-grid" style={{ gridTemplateColumns: `repeat(${layout.columns}, 58px)` }}>
+     <div className="portrait-seat-grid live-seat-grid" style={{
+      gridTemplateColumns: `repeat(${layout.columns}, 44px)`,
+      gridAutoRows: "44px",
+      gap: "2px",
+      justifyContent: "center",
+        }}
+      >
         {layout.seats.map(renderSeat)}
       </div>
       <div className="rear-marker">REAR</div>
