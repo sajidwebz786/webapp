@@ -341,7 +341,7 @@ function BusHero({ cities, user, setUser, setPage, refreshBookings, pendingRoute
         <img src={orbitaHome} alt="Orbita Travels" className="hero-image" />
         <div className="hero-copy">
           <span className="eyebrow">Travel across India with confidence</span>
-          <h1>India’s refined bus ticket booking experience</h1>
+          <h1>India's refined bus ticket booking experience</h1>
           <p>Compare trusted operators, choose seats, manage trips and get help before, during and after your journey.</p>
         </div>
       </div>
@@ -618,10 +618,8 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
 }
 
 function buildDeckLayout(seats, berthLike) {
-  const fallbackCols = berthLike ? [1, 2, 3] : [1, 2, 3, 4, 5, 6, 7]; // Support up to 7 columns as in your API
+  const fallbackCols = berthLike ? [1, 2, 3] : [1, 2, 3, 4, 5, 6, 7];
   const raw = seats.map((seat, index) => {
-    // Map your API's property names to what the code expects
-    // Your API uses: ColumnNo, RowNo, Height, Width, SeatType
     const apiColumn = Number(seat.ColumnNo || seat.column);
     const apiRow = Number(seat.RowNo || seat.row);
     const apiHeight = Number(seat.Height || seat.height || 1);
@@ -630,14 +628,13 @@ function buildDeckLayout(seats, berthLike) {
     const fallbackRow = Math.floor(index / fallbackCols.length) + 1;
     const fallbackColumn = fallbackCols[index % fallbackCols.length];
     
-    // Use API's height values directly - don't force berth height=2
     return {
       ...seat,
       row: hasCoordinates ? apiRow : fallbackRow,
       column: hasCoordinates ? apiColumn : fallbackColumn,
       width: Math.max(1, apiWidth),
       height: Math.max(1, apiHeight),
-      isBerth: apiHeight > 1 // Set isBerth based on API's Height value
+      isBerth: apiHeight > 1
     };
   });
   const minRow = Math.min(...raw.map((seat) => seat.row));
@@ -647,28 +644,12 @@ function buildDeckLayout(seats, berthLike) {
     row: seat.row + (minRow === 0 ? 1 : 0),
     column: seat.column + (minColumn === 0 ? 1 : 0)
   }));
-    // Add these 4 lines HERE (after the if/else block that creates seats array)
-  console.log("🎯 API SeatLayout:", route.seatLayout);
-  console.log("🪑 Processed seats array:", seats);
-  console.log("👥 Upper deck seats count:", upperSeats.length);
-  
-  // Add this fallback check if seats are still empty
-  if (!seats.length && route.SeatDetails) {
-    seats = route.SeatDetails.flat().map(seat => ({
-      ...seat,
-      id: seat.SeatName || seat.SeatIndex,
-      label: seat.SeatName,
-      deck: seat.IsUpper ? "upper" : "lower",
-      isWalkway: false
-    }));
-    console.log("♻️ Found route.SeatDetails directly, rebuilt seats array:", seats);
-  }
 
   if (!seats.length) {
     console.error("❌ No seats found - check the API response structure!");
-    return <div className="empty-results">Seat layout error: check browser console. Seats length: {seats.length}</div>;
+    return { seats: [], rows: [], columns: 0 };
   }
-  // NEVER rotate - always maintain portrait orientation (fixes landscape issue)
+
   const oriented = prepared;
   const orientedMinRow = Math.min(...oriented.map((seat) => seat.row));
   const orientedMinColumn = Math.min(...oriented.map((seat) => seat.column));
@@ -678,7 +659,6 @@ function buildDeckLayout(seats, berthLike) {
     column: seat.column - orientedMinColumn + 1
   }));
   
-  // Normalize column numbers to be sequential (1, 2, 3, 4 instead of 1, 3, 5, 7)
   const uniqueColumns = [...new Set(finalSeats.map((seat) => seat.column))].sort((a, b) => a - b);
   const columnMap = {};
   uniqueColumns.forEach((col, index) => {
@@ -691,11 +671,10 @@ function buildDeckLayout(seats, berthLike) {
   
   const maxColumn = Math.max(
     ...normalizedSeats.map(seat => seat.column + (seat.width || 1) - 1)
-);
+  );
   const rows = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
 }
-
 
 function PortraitSeatChart({ route, selected, setSelected }) {
   const unavailable = new Set(route.seatLayout?.unavailable || []);
@@ -703,10 +682,8 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   const isSleeper = layoutType.includes("sleeper");
   const isMixed = layoutType.includes("mixed") || layoutType.includes("sleeper-seater");
   
-  // Handle your API's SeatLayout structure - it returns SeatDetails as a 2D array
   let seats = [];
   if (route.seatLayout?.SeatDetails) {
-    // Flatten the 2D array from your API and map all properties
     seats = route.seatLayout.SeatDetails.flat().map(seat => ({
       ...seat,
       id: seat.SeatName || seat.SeatIndex,
@@ -715,7 +692,6 @@ function PortraitSeatChart({ route, selected, setSelected }) {
       isWalkway: false
     }));
   } else {
-    // Fallback to the old structure if it exists
     seats = route.seatLayout?.seats || [];
   }
   
@@ -726,8 +702,6 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
   const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);
 
-  console.log("📊 Lower deck layout:", lower);
-  console.log("☁️ Upper deck layout:", upper);
   const toggle = (id) => {
     if (unavailable.has(id)) return;
     setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
@@ -746,14 +720,10 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
   const renderSeat = (seat, index) => {
     const sold = unavailable.has(seat.id);
     const chosen = selected.includes(seat.id);
-    // Check API's IsLadiesSeat property from your JSON response
     const women = seat.IsLadiesSeat || seat.ladies || index % 7 === 2;
-    // Show as chair (Armchair) if height=1 (SEAT), berth only if height>1 (BERTH)
     const isBerth = seat.height > 1 || seat.isBerth;
-    // Use API's SeatFare or Price.OfferedPrice from your JSON
     const fare = Number(seat.SeatFare || seat.Price?.OfferedPrice || seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
-  console.log(`🪑 Seat ${seat.id}: width=${seat.width}, height=${seat.height}, isBerth=${isBerth}`);
-    const sold = unavailable.has(seat.id);
+    
     return (
       <button
         key={seat.id}
@@ -761,13 +731,13 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
         onClick={() => toggle(seat.id)}
         aria-label={`${title} seat ${seat.id}`}
         style={{
-    gridColumnStart: seat.column,
-    gridColumnEnd: `span ${seat.width || 1}`,
-    gridRowStart: seat.row,
-    gridRowEnd: `span ${seat.height || 1}`,
-    alignSelf: "stretch",
-    justifySelf: "stretch"
-}}
+          gridColumnStart: seat.column,
+          gridColumnEnd: `span ${seat.width || 1}`,
+          gridRowStart: seat.row,
+          gridRowEnd: `span ${seat.height || 1}`,
+          alignSelf: "stretch",
+          justifySelf: "stretch"
+        }}
       >
         <b>{seat.SeatName || seat.label || seat.id}</b>
         {isBerth ? <span className="pillow" /> : <Armchair size={17} />}
@@ -781,13 +751,12 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
       <div className="deck-head"><h3>{title}</h3><span>Driver</span></div>
       <div className="bus-front-marker"><i /> <b>FRONT OF VEHICLE</b></div>
       <div className="vehicle-icons"><span>WC</span><span>Door</span></div>
-     <div className="portrait-seat-grid live-seat-grid" style={{
-      gridTemplateColumns: `repeat(${layout.columns}, 44px)`,
-      gridAutoRows: "44px",
-      gap: "2px",
-      justifyContent: "center",
-        }}
-      >
+      <div className="portrait-seat-grid live-seat-grid" style={{
+        gridTemplateColumns: `repeat(${layout.columns || 4}, 44px)`,
+        gridAutoRows: "44px",
+        gap: "2px",
+        justifyContent: "center",
+      }}>
         {layout.seats.map(renderSeat)}
       </div>
       <div className="rear-marker">REAR</div>
@@ -919,7 +888,7 @@ function BookingModal({ route, query, user, message, onClose, onBuy }) {
         </div>
         {step === "points" && <BoardDropStep boardingPoints={boardingPoints} droppingPoints={droppingPoints} boardingPoint={boardingPoint} setBoardingPoint={setBoardingPoint} dropPoint={dropPoint} setDropPoint={setDropPoint} />}
         {step === "seats" && <SeatDetailsStep route={route} selectedSeats={selectedSeats} setSelectedSeats={setSelectedSeats} />}
-        {step === "passenger" && <><PassengerForm query={query} selectedSeats={selectedSeats} passengers={passengers} setPassengers={setPassengers} contact={contact} setContact={setContact} /><p className="identity-note">The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding.</p><FareSummary total={total} route={route} boardingPoint={boardingPoint} dropPoint={dropPoint} seats={seats} /></>}
+        {step === "passenger" && <><PassengerForm query={query} selectedSeats={selectedSeats} passengers={passengers} setPassengers={setPassengers} contact={contact} setContact={setContact} mode={route.type} /><p className="identity-note">The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding.</p><FareSummary total={total} route={route} boardingPoint={boardingPoint} dropPoint={dropPoint} seats={seats} /></>}
         <div className="modal-actions">
           <button className="secondary-action" onClick={onClose}>Back to results</button>
           {step !== "passenger" ? <button className="primary" onClick={() => setStep(step === "points" ? "seats" : "passenger")}>Continue</button> : <button className="primary" onClick={() => onBuy({ route, query, selectedSeats: seats, passengers, contact, boardingPoint, dropPoint, totalAmount: total })}>Buy ticket</button>}
@@ -1236,7 +1205,6 @@ function SeatMap({ route, selected, setSelected }) {
     <div className="seat-landscape">
       <div className={`seat-map ${route.type}`}>
         {seats.map((seat) => {
-          // Skip rendering walkway seats in landscape view
           if (seat.isWalkway) {
             return <div key={seat.id} className="seat-walkway-landscape" />;
           }
@@ -1319,7 +1287,7 @@ function WhatsNew() {
       <div className="section-title">
         <div>
           <span className="section-kicker">Platform updates</span>
-          <h2>What’s new</h2>
+          <h2>What's new</h2>
         </div>
       </div>
       <div className="news-row">
@@ -1365,7 +1333,7 @@ function Testimonials() {
       <div className="testimonial-row">
         {stories.map(([name, role, quote]) => (
           <article key={name}>
-            <div className="quote-mark">“</div>
+            <div className="quote-mark">"</div>
             <p>{quote}</p>
             <footer>
               <span>{name.charAt(0)}</span>
@@ -1568,7 +1536,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
   const [purchasing, setPurchasing] = useState(false);
 
   if (!pendingCheckout) {
-    return <section className="page-band"><div className="page-heading"><TicketIcon /><div><h1>No ticket selected</h1><p>Please select a journey first.</p></div></div><button className="primary" onClick={() => setPage("bus")}>Search buses</button></section>;
+    return <section className="page-band"><div className="page-heading"><CalendarDays size={34} /><div><h1>No ticket selected</h1><p>Please select a journey first.</p></div></div><button className="primary" onClick={() => setPage("bus")}>Search buses</button></section>;
   }
 
   if (!user) {
@@ -1643,10 +1611,6 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
       </article>
     </section>
   );
-}
-
-function TicketIcon() {
-  return <CalendarDays size={34} />;
 }
 
 function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
@@ -1751,7 +1715,7 @@ function SupportForm({ user, bookings }) {
 
 function FloatingAssistant({ user, bookings }) {
   const [open, setOpen] = useState(false);
-  const [chat, setChat] = useState([{ sender: "assistant", message: "Hi, I’m Tiara. I can help with booking, cancellation, boarding, tracking, emergencies and feedback." }]);
+  const [chat, setChat] = useState([{ sender: "assistant", message: "Hi, I'm Tiara. I can help with booking, cancellation, boarding, tracking, emergencies and feedback." }]);
   const [text, setText] = useState("");
   const send = async (intent = "travel_assistance") => {
     if (!text.trim()) return;
