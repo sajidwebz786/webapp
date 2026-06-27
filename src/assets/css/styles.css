@@ -1049,3 +1049,16 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
   .ticket-window-head h3 { font-size: 20px; }
   .ticket-window-body { padding: 12px; }
 }
+.portrait-seat-grid {
+  transform: none !important;
+  transform-origin: center;
+  width: 100% !important;
+}
+.chair-seat {
+  background: #e8f5e9;
+  border: 1px solid #4caf50;
+}
+.sleeper-berth {
+  background: #fff3e0;
+  border: 1px solid #ff9800;
+}

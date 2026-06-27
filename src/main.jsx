@@ -647,6 +647,27 @@ function buildDeckLayout(seats, berthLike) {
     row: seat.row + (minRow === 0 ? 1 : 0),
     column: seat.column + (minColumn === 0 ? 1 : 0)
   }));
+    // Add these 4 lines HERE (after the if/else block that creates seats array)
+  console.log("🎯 API SeatLayout:", route.seatLayout);
+  console.log("🪑 Processed seats array:", seats);
+  console.log("👥 Upper deck seats count:", upperSeats.length);
+  
+  // Add this fallback check if seats are still empty
+  if (!seats.length && route.SeatDetails) {
+    seats = route.SeatDetails.flat().map(seat => ({
+      ...seat,
+      id: seat.SeatName || seat.SeatIndex,
+      label: seat.SeatName,
+      deck: seat.IsUpper ? "upper" : "lower",
+      isWalkway: false
+    }));
+    console.log("♻️ Found route.SeatDetails directly, rebuilt seats array:", seats);
+  }
+
+  if (!seats.length) {
+    console.error("❌ No seats found - check the API response structure!");
+    return <div className="empty-results">Seat layout error: check browser console. Seats length: {seats.length}</div>;
+  }
   // NEVER rotate - always maintain portrait orientation (fixes landscape issue)
   const oriented = prepared;
   const orientedMinRow = Math.min(...oriented.map((seat) => seat.row));
@@ -674,6 +695,7 @@ function buildDeckLayout(seats, berthLike) {
   const rows = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
 }
+
 
 function PortraitSeatChart({ route, selected, setSelected }) {
   const unavailable = new Set(route.seatLayout?.unavailable || []);
@@ -704,6 +726,8 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
   const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);
 
+  console.log("📊 Lower deck layout:", lower);
+  console.log("☁️ Upper deck layout:", upper);
   const toggle = (id) => {
     if (unavailable.has(id)) return;
     setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
@@ -728,7 +752,8 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
     const isBerth = seat.height > 1 || seat.isBerth;
     // Use API's SeatFare or Price.OfferedPrice from your JSON
     const fare = Number(seat.SeatFare || seat.Price?.OfferedPrice || seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
-
+  console.log(`🪑 Seat ${seat.id}: width=${seat.width}, height=${seat.height}, isBerth=${isBerth}`);
+    const sold = unavailable.has(seat.id);
     return (
       <button
         key={seat.id}
