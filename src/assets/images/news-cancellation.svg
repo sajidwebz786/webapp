@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title">
+  <title>Cancellation window illustration</title>
+  <defs>
+    <linearGradient id="bg" x1="28" y1="16" x2="132" y2="144" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff5f7"/>
+      <stop offset="1" stop-color="#ffdbe3"/>
+    </linearGradient>
+    <linearGradient id="ticket" x1="44" y1="44" x2="122" y2="114" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff6f86"/>
+      <stop offset="1" stop-color="#c51934"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="36" fill="url(#bg)"/>
+  <circle cx="116" cy="42" r="18" fill="#fff" opacity=".85"/>
+  <circle cx="42" cy="126" r="22" fill="#fff" opacity=".72"/>
+  <path d="M47 55c0-7 6-13 13-13h51c7 0 13 6 13 13v12c-7 0-12 5-12 12s5 12 12 12v14c0 7-6 13-13 13H60c-7 0-13-6-13-13V91c7 0 12-5 12-12S54 67 47 67V55Z" fill="url(#ticket)"/>
+  <path d="M78 58v44" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-dasharray="7 9" opacity=".82"/>
+  <path d="M91 68l18 18m0-18L91 86" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M52 104h21" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+</svg>

@@ -5,8 +5,13 @@ import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, Calendar
 import { API_URL, api, tokenStore } from "./services/api";
 import { Logo } from "./components/Logo";
 import apsrtcLogo from "./assets/images/apsrtc-logo.png";
+import footerLogo from "./assets/images/footer-logo.png";
 import ksrtcLogo from "./assets/images/ksrtc-logo.png";
 import tgsrtcLogo from "./assets/images/tgsrtc-logo.jpg";
+import newsAssurance from "./assets/images/news-assurance.svg";
+import newsCancellation from "./assets/images/news-cancellation.svg";
+import newsTimetable from "./assets/images/news-timetable.svg";
+import orbitaHome from "./assets/images/orbita-home.png";
 import "./assets/css/styles.css";
 
 const services = [
@@ -333,6 +338,7 @@ function BusHero({ cities, user, setUser, setPage, refreshBookings, pendingRoute
   return (
     <section className="bus-hero">
       <div className="hero-art">
+        <img src={orbitaHome} alt="Orbita Travels" className="hero-image" />
         <div className="hero-copy">
           <span className="eyebrow">Travel across India with confidence</span>
           <h1>India’s refined bus ticket booking experience</h1>
@@ -345,15 +351,56 @@ function BusHero({ cities, user, setUser, setPage, refreshBookings, pendingRoute
 }
 
 function ServicePage({ type, cities, user, setUser, setPage, refreshBookings, setPendingCheckout, setActiveJourney }) {
-  const copy = {
-    flight: ["Flights", "Fly between Indian cities with clear fares and smooth traveller details.", Plane],
-    train: ["Train Tickets", "Plan comfortable rail journeys with class options, passenger details and support.", Train]
+  const pageCopy = {
+    flight: {
+      title: "Flights",
+      text: "Fly between Indian cities with clear fares, smooth traveller details and support from search to boarding.",
+      icon: Plane,
+      image: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1100&q=80",
+      eyebrow: "Air travel desk",
+      points: ["Domestic and international routing", "One-way and round-trip fares", "Traveller details and assisted checkout"],
+      stats: [["150+", "city pairs"], ["24/7", "fare support"], ["6", "travellers per booking"]]
+    },
+    train: {
+      title: "Train Tickets",
+      text: "Plan comfortable rail journeys with class options, passenger details and practical support for every route.",
+      icon: Train,
+      image: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=1100&q=80",
+      eyebrow: "Rail planning desk",
+      points: ["Popular city connections", "Simple passenger handling", "Date planning for onward journeys"],
+      stats: [["120+", "rail routes"], ["Live", "date planning"], ["Easy", "trip review"]]
+    }
   };
-  const [title, text, Icon] = copy[type];
+  const details = pageCopy[type];
+  const Icon = details.icon;
   return (
-    <section className="page-band service-page">
-      <div className="page-heading"><Icon size={34} /><div><h1>{title}</h1><p>{text}</p></div></div>
+    <section className={`service-page service-page-${type}`}>
+      <div className="service-hero">
+        <div className="service-hero-copy">
+          <span className="section-kicker">{details.eyebrow}</span>
+          <div className="page-heading"><Icon size={34} /><div><h1>{details.title}</h1><p>{details.text}</p></div></div>
+          <div className="service-point-row">
+            {details.points.map((point) => <span key={point}>{point}</span>)}
+          </div>
+        </div>
+        <div className="service-hero-media">
+          <img src={details.image} alt={`${details.title} travel`} />
+        </div>
+      </div>
       <JourneySearch type={type} cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />
+      <div className="service-story-grid">
+        {details.stats.map(([value, label]) => <article key={label}><strong>{value}</strong><span>{label}</span></article>)}
+      </div>
+      <div className="service-info-band">
+        <article>
+          <h2>Built for quick booking decisions</h2>
+          <p>Compare routes, select dates, add traveller details and move into checkout without losing context. Orbita keeps the page focused on the journey you are building.</p>
+        </article>
+        <article>
+          <h2>Support after search</h2>
+          <p>Booking flows connect into account, checkout and trip management, so the traveller has a clear path from discovery to confirmation.</p>
+        </article>
+      </div>
     </section>
   );
 }
@@ -413,7 +460,7 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   }, [type, query.scope]);
 
   return (
-    <div className={`journey-module ${compactHero ? "hero-search" : ""} ${isBus ? "bus-search-module" : ""}`}>
+    <div className={`journey-module ${compactHero ? "hero-search" : ""} ${isBus ? "bus-search-module" : "service-search-module"}`}>
       {!isBus && (
         <div className="radio-row">
           {type === "flight" && (
@@ -430,7 +477,7 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
       {isBus ? (
         <div className="abhi-search-bar">
           <div className="abhi-field">
-            <span className="abhi-label"><MapPin size={18} /> Source</span>
+            <span className="abhi-label"><MapPin size={18} /> Origin</span>
             <CityDropdown
               value={query.from}
               placeholder="Select city"
@@ -1159,16 +1206,64 @@ function PassengerForm({ query, selectedSeats, passengers, setPassengers, contac
 
 function OffersStrip() {
   const offers = [
-    [Bus, "Bus", "Save on premium bus journeys", "FIRST"],
-    [Train, "Train", "Flexible date change support", "FLEXI"],
-    [Plane, "Flight", "Smart weekday fares", "SKY"],
-    [Hotel, "Hotel", "Stay more, save more", "STAY"]
+    { icon: Bus, label: "Bus", title: "Premium bus journeys", detail: "Reserved seats, clean coaches and smart boarding alerts.", code: "FIRST", kicker: "Up to 18% off" },
+    { icon: Train, label: "Train", title: "Flexible date support", detail: "Switch eligible travel dates without the usual friction.", code: "FLEXI", kicker: "Free change" },
+    { icon: Plane, label: "Flight", title: "Smart weekday fares", detail: "Low-demand windows surfaced for faster planning.", code: "SKY", kicker: "Fare drop" },
+    { icon: Hotel, label: "Hotel", title: "Stay more, save more", detail: "Stack hotel savings with your next onward journey.", code: "STAY", kicker: "Bundle perk" }
   ];
-  return <section className="clean-section"><div className="section-title"><h2>Offers for you</h2><a>View more</a></div><div className="offer-row">{offers.map(([Icon, label, title, code]) => <article key={code}><span className="offer-icon" title={label} aria-label={label}><Icon size={22} /></span><h3>{title}</h3><p>Valid this season</p><b>{code}</b></article>)}</div></section>;
+  return (
+    <section className="clean-section offers-section">
+      <div className="section-title">
+        <div>
+          <span className="section-kicker">Travel deals</span>
+          <h2>Offers for you</h2>
+        </div>
+        <a>View more</a>
+      </div>
+      <div className="offer-row">
+        {offers.map(({ icon: Icon, label, title, detail, code, kicker }) => (
+          <article key={code}>
+            <span className="offer-card-glow" aria-hidden="true" />
+            <div className="offer-card-top">
+              <span className="offer-icon" title={label} aria-label={label}><Icon size={22} /></span>
+              <small>{kicker}</small>
+            </div>
+            <h3>{title}</h3>
+            <p>{detail}</p>
+            <b>{code}</b>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function WhatsNew() {
-  return <section className="clean-section"><h2>What’s new</h2><div className="news-row"><article><Sparkles /><h3>Free cancellation window</h3><p>Enjoy more flexibility on selected bus services.</p></article><article><CalendarDays /><h3>Live bus timetable</h3><p>View local timing signals for popular routes.</p></article><article><ShieldCheck /><h3>Assurance support</h3><p>Help for cancellations, delays and urgent journey concerns.</p></article></div></section>;
+  const updates = [
+    { image: newsCancellation, stat: "30 min", title: "Free cancellation window", copy: "Cancel selected services close to departure and keep more of your fare protected." },
+    { image: newsTimetable, stat: "Live", title: "Bus timetable signals", copy: "Fresh local timing cues for routes where demand shifts through the day." },
+    { image: newsAssurance, stat: "24/7", title: "Assurance support", copy: "Priority help for cancellations, delays and urgent journey concerns." }
+  ];
+  return (
+    <section className="clean-section whats-new-section">
+      <div className="section-title">
+        <div>
+          <span className="section-kicker">Platform updates</span>
+          <h2>What’s new</h2>
+        </div>
+      </div>
+      <div className="news-row">
+        {updates.map(({ image, stat, title, copy }) => (
+          <article key={title}>
+            <div className="news-icon-wrap"><img src={image} alt="" /></div>
+            <strong>{stat}</strong>
+            <h3>{title}</h3>
+            <p>{copy}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function GovernmentBuses() {
@@ -1185,25 +1280,29 @@ function PackagesPreview({ packages, setPage }) {
 }
 
 function Testimonials() {
+  const stories = [
+    ["Anjali", "Frequent commuter", "Each bus was clean, punctual and easy to book. Orbita Travels made the whole journey seamless from search to boarding."],
+    ["Rohan", "Corporate traveller", "Customer support responded fast and helped me choose the right boarding point. The experience felt polished and reliable."],
+    ["Meera", "Weekend getaway", "Seat selection was smooth and updates were clear throughout the trip. This is a premium booking experience."]
+  ];
   return (
     <section className="clean-section narrow testimonial-section">
       <div className="section-head">
+        <span className="section-kicker">Traveller stories</span>
         <h2>Testimonials</h2>
         <p className="section-subtitle">Hear from travellers who plan journeys with Orbita Travels.</p>
       </div>
       <div className="testimonial-row">
-        <article>
-          <p>“Each bus was clean, punctual and easy to book. Orbita Travels made the whole journey seamless from search to boarding.”</p>
-          <footer>— Anjali, frequent commuter</footer>
-        </article>
-        <article>
-          <p>“Customer support responded fast and helped me choose the right boarding point. The experience felt polished and reliable.”</p>
-          <footer>— Rohan, corporate traveller</footer>
-        </article>
-        <article>
-          <p>“Seat selection was smooth and updates were clear throughout the trip. This is a premium booking experience.”</p>
-          <footer>— Meera, weekend getaway</footer>
-        </article>
+        {stories.map(([name, role, quote]) => (
+          <article key={name}>
+            <div className="quote-mark">“</div>
+            <p>{quote}</p>
+            <footer>
+              <span>{name.charAt(0)}</span>
+              <div><strong>{name}</strong><small>{role}</small></div>
+            </footer>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -1231,11 +1330,47 @@ function HotelsPage({ hotels, setPage, setPendingCheckout }) {
     setPage("auth");
   };
 
-  return <section className="page-band"><div className="page-heading"><Hotel size={34} /><div><h1>Hotels</h1><p>Search stays for holidays, business trips and family travel.</p></div></div><div className="card-grid">{hotels.map((hotel) => <article className="travel-card" key={hotel.id || hotel.externalHotelCode || hotel.name}><img src={hotel.imageUrl} alt={hotel.name} /><div><span>{hotel.starRating} star · {hotel.city}</span><h3>{hotel.name}</h3><p>{hotel.amenities?.join(" · ")}</p></div><footer><b>₹{Number(hotel.pricePerNight).toLocaleString("en-IN")}/night</b><button onClick={() => bookHotel(hotel)}>Book room</button></footer></article>)}</div>{!hotels.length && <div className="empty-results">No hotels are available for the selected city/date right now.</div>}</section>;
+  return (
+    <section className="catalog-page hotel-page">
+      <div className="catalog-hero">
+        <div>
+          <span className="section-kicker">Stay collection</span>
+          <div className="page-heading"><Hotel size={34} /><div><h1>Hotels</h1><p>Search stays for holidays, business trips and family travel.</p></div></div>
+          <p className="catalog-lede">Choose city hotels, premium stays and family-friendly rooms that pair naturally with your bus, train or flight plans.</p>
+        </div>
+        <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1100&q=80" alt="Hotel lobby and pool" />
+      </div>
+      <div className="catalog-feature-row">
+        <article><strong>Verified comfort</strong><span>Hotels with practical amenities and clear nightly pricing.</span></article>
+        <article><strong>Trip-ready stays</strong><span>Good for business nights, family breaks and onward journeys.</span></article>
+        <article><strong>Easy checkout</strong><span>Review room details and confirm from the same Orbita flow.</span></article>
+      </div>
+      <div className="section-title"><h2>Available stays</h2><p>{hotels.length ? `${hotels.length} stays ready to book` : "No stays available right now"}</p></div>
+      <div className="card-grid">{hotels.map((hotel) => <article className="travel-card" key={hotel.id || hotel.externalHotelCode || hotel.name}><img src={hotel.imageUrl} alt={hotel.name} /><div><span>{hotel.starRating} star · {hotel.city}</span><h3>{hotel.name}</h3><p>{hotel.amenities?.join(" · ")}</p></div><footer><b>₹{Number(hotel.pricePerNight).toLocaleString("en-IN")}/night</b><button onClick={() => bookHotel(hotel)}>Book room</button></footer></article>)}</div>{!hotels.length && <div className="empty-results">No hotels are available for the selected city/date right now.</div>}
+    </section>
+  );
 }
 
 function PackagesPage({ packages }) {
-  return <section className="page-band"><div className="page-heading"><BriefcaseBusiness size={34} /><div><h1>Curated Packages</h1><p>Family tours, luxury getaways, honeymoon escapes and seasonal plans.</p></div></div><div className="card-grid">{packages.map((pkg) => <article className="travel-card" key={pkg.id}><img src={pkg.imageUrl} alt={pkg.title} /><div><span>{pkg.category}</span><h3>{pkg.title}</h3><p>{pkg.durationDays} days · {pkg.inclusions?.join(" · ")}</p></div><footer><b>₹{Number(pkg.price).toLocaleString("en-IN")}</b><button>Enquire</button></footer></article>)}</div></section>;
+  return (
+    <section className="catalog-page packages-page">
+      <div className="catalog-hero">
+        <div>
+          <span className="section-kicker">Planned escapes</span>
+          <div className="page-heading"><BriefcaseBusiness size={34} /><div><h1>Curated Packages</h1><p>Family tours, luxury getaways, honeymoon escapes and seasonal plans.</p></div></div>
+          <p className="catalog-lede">Pick a prepared itinerary when you want transport, stays and experiences to feel connected instead of assembled in pieces.</p>
+        </div>
+        <img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1100&q=80" alt="Scenic travel package destination" />
+      </div>
+      <div className="catalog-feature-row">
+        <article><strong>Handpicked routes</strong><span>Shortlist plans by category, inclusions and duration.</span></article>
+        <article><strong>Seasonal ideas</strong><span>Weekend, honeymoon, family and premium getaway options.</span></article>
+        <article><strong>Enquiry-first flow</strong><span>Start with a package and finalize details with support.</span></article>
+      </div>
+      <div className="section-title"><h2>Featured packages</h2><p>{packages.length ? `${packages.length} curated plans` : "Packages will appear here soon"}</p></div>
+      <div className="card-grid">{packages.map((pkg) => <article className="travel-card" key={pkg.id}><img src={pkg.imageUrl} alt={pkg.title} /><div><span>{pkg.category}</span><h3>{pkg.title}</h3><p>{pkg.durationDays} days · {pkg.inclusions?.join(" · ")}</p></div><footer><b>₹{Number(pkg.price).toLocaleString("en-IN")}</b><button>Enquire</button></footer></article>)}</div>
+    </section>
+  );
 }
 
 function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, setAuthReturnPage, authMessage }) {
@@ -1530,7 +1665,7 @@ function TicketWindow({ booking, onClose }) {
 }
 
 function SupportPage({ user, bookings }) {
-  return <section className="page-band"><div className="page-heading"><Headphones size={34} /><div><h1>Help and Support</h1><p>Get help with booking, boarding, cancellations, tracking, emergencies and feedback.</p></div></div><SupportForm user={user} bookings={bookings} /></section>;
+  return <section className="page-band support-page"><div className="page-heading"><Headphones size={34} /><div><h1>Help and Support</h1><p>Get help with booking, boarding, cancellations, tracking, emergencies and feedback.</p></div></div><SupportForm user={user} bookings={bookings} /></section>;
 }
 
 function SupportForm({ user, bookings }) {
@@ -1563,7 +1698,125 @@ function FloatingAssistant({ user, bookings }) {
   return <div className={`floating-chat ${open ? "open" : ""}`}><button className="chat-launch" onClick={() => setOpen(!open)}><Sparkles size={22} /> Ask Tiara</button>{open && <div className="chat-panel"><h3><span><Bot size={19} /> Orbita Travels Assistant</span><button onClick={() => setOpen(false)} aria-label="Close assistant">×</button></h3><div className="chat-window">{chat.map((item, index) => <div key={index} className={`chat-bubble ${item.sender}`}>{item.message}</div>)}</div><textarea placeholder="Ask about booking, boarding, cancellation, tracking, accident support or feedback" value={text} onChange={(e) => setText(e.target.value)} /><div className="chat-actions"><button onClick={() => send("travel_assistance")}><MessageSquare size={16} /> Send</button><button className="urgent" onClick={() => send("emergency")}>Urgent help</button></div></div>}</div>;
 }
 
-function CancellationPolicyModal({ onClose }) {
+const footerModalContent = {
+  home: {
+    eyebrow: "Orbita Travels",
+    title: "Home",
+    intro: "Orbita Travels brings buses, flights, trains, hotels and curated packages into one booking experience for Indian travellers.",
+    bullets: ["Search trusted transport operators.", "Compare fares, timings and service details.", "Manage checkout, account and support from one place."]
+  },
+  offers: {
+    eyebrow: "Travel Deals",
+    title: "Offers",
+    intro: "Offers are seasonal benefits across buses, hotels, flights and package journeys. Availability depends on route, operator and travel date.",
+    bullets: ["Use visible offer codes only on eligible bookings.", "Discounts may not combine with every wallet, bank or operator promotion.", "Final benefits are shown before checkout."]
+  },
+  about: {
+    eyebrow: "About",
+    title: "About Orbita Travels",
+    intro: "Orbita Travels is designed as a clean travel desk for planning, booking and managing journeys with practical support before and after departure.",
+    bullets: ["Built for city-to-city travel discovery.", "Focused on transparent fares and passenger details.", "Support flows cover booking, boarding, cancellation and feedback."]
+  },
+  contact: {
+    eyebrow: "Contact",
+    title: "Contact Orbita Travels",
+    intro: "For booking help, trip questions or service feedback, use the Help and Support page or the Tiara assistant available on the site.",
+    bullets: ["Share your booking code when available.", "Use urgent priority for time-sensitive boarding or cancellation issues.", "Logged-in users can attach support requests to bookings."]
+  },
+  faqs: {
+    eyebrow: "Help",
+    title: "Frequently Asked Questions",
+    intro: "Common questions are handled through support categories so the right team can respond with the correct booking context.",
+    bullets: ["Can I cancel a ticket? Yes, according to the operator-specific cancellation window.", "Can I track a trip? Tracking details appear where live tracking is supported.", "Can I update passenger details? Contact support before travel if a correction is needed."]
+  },
+  terms: {
+    eyebrow: "Legal",
+    title: "Terms",
+    intro: "These general terms explain the commercial relationship between Orbita Travels, travellers and listed travel partners.",
+    bullets: ["Orbita Travels presents travel inventory from operators and partners.", "Bookings are subject to availability, fare changes and partner rules.", "Customers are responsible for accurate passenger, contact and identity details."]
+  },
+  privacy: {
+    eyebrow: "Privacy",
+    title: "Privacy Notice",
+    intro: "Orbita Travels collects only the details needed to search, book, support and communicate about journeys.",
+    bullets: ["Contact details support ticket emails, SMS notifications and account communication.", "Booking details are used for confirmations, support and trip history.", "Payment processing is handled through secure payment partners when enabled."]
+  },
+  disclosure: {
+    eyebrow: "Security",
+    title: "Responsible Disclosure",
+    intro: "We appreciate reports that help keep travellers and booking data safe.",
+    bullets: ["Report suspected vulnerabilities with clear reproduction steps.", "Do not access, modify or expose another traveller's data.", "Give the team reasonable time to investigate before public disclosure."]
+  },
+  operators: {
+    eyebrow: "Partners",
+    title: "Operators",
+    intro: "Orbita Travels lists transport and stay partners so travellers can compare practical options in one place.",
+    bullets: ["Operator amenities, timings and cancellation rules may vary.", "Official logos and names remain trademarks of their respective owners.", "Service quality feedback helps improve future recommendations."]
+  },
+  routes: {
+    eyebrow: "Routes",
+    title: "Routes",
+    intro: "Route pages help travellers discover popular city connections and start a bus search quickly.",
+    bullets: ["Popular routes are grouped by travel demand and coverage.", "Availability depends on date, city pair and operator inventory.", "Use the search page for live fares and seat options."]
+  },
+  careers: {
+    eyebrow: "Careers",
+    title: "Careers",
+    intro: "Orbita Travels is building tools for travel discovery, support and booking operations.",
+    bullets: ["Product, support, operations and engineering roles may open as the platform expands.", "Customer empathy and reliability matter across every team.", "Use Contact or Support to register hiring-related interest."]
+  },
+  management: {
+    eyebrow: "Company",
+    title: "Our Management",
+    intro: "Orbita Travels is managed with a focus on transparent journeys, useful support and dependable booking workflows.",
+    bullets: ["Leadership priorities include service quality, traveller trust and partner coverage.", "Operational teams monitor support, fulfilment and product experience.", "Management updates will be published as the company grows."]
+  },
+  investors: {
+    eyebrow: "Company",
+    title: "Investors Relations",
+    intro: "Investor updates will cover product expansion, partner coverage and customer experience milestones.",
+    bullets: ["Current focus is product readiness and trusted travel workflows.", "Formal financial disclosures will be shared through approved company channels.", "Use Contact for investor communication requests."]
+  },
+  termsOfUse: {
+    eyebrow: "Legal",
+    title: "Terms of Use",
+    intro: "These terms govern how customers use the Orbita Travels website, account features, search tools and support flows.",
+    bullets: ["Do not misuse search, booking, support or account features.", "Keep login credentials secure and notify support about unauthorized activity.", "Website content, interface and data may not be copied or scraped without permission."]
+  },
+  career: {
+    eyebrow: "Careers",
+    title: "Career",
+    intro: "Career enquiries can be shared with Orbita Travels as the product and support teams expand.",
+    bullets: ["Include your area of interest and relevant experience.", "Support and operations roles value clear communication.", "Product and engineering roles value reliable execution and user empathy."]
+  },
+  customerService: {
+    eyebrow: "Support",
+    title: "Customer Service",
+    intro: "Customer service helps with booking questions, boarding issues, cancellations, tracking and feedback.",
+    bullets: ["Use Help and Support for requests tied to a booking.", "Choose urgent or emergency priority only for time-sensitive issues.", "Tiara can guide you before a support request is submitted."]
+  },
+  cancellation: {
+    eyebrow: "Cancellation & Refunds",
+    title: "Orbita Travels cancellation policy",
+    intro: "Orbita Travels follows standard operator cancellation rules to keep refunds fair and transparent for every booking.",
+    table: {
+      headers: ["Cancellation window", "Refund"],
+      rows: cancellationPolicyRows
+    },
+    bullets: [
+      "Cancel more than 24 hours before departure to receive up to 90% of the base fare.",
+      "Partial refunds apply for cancellations made between 6 and 24 hours before departure.",
+      "No refund is provided for no-shows or cancellations within 6 hours of departure.",
+      "Convenience and payment gateway charges are non-refundable.",
+      "Approved refunds are processed within 5-7 working days to the original payment method.",
+      "Operator cancellations qualify for a full refund or free rescheduling.",
+      "One free date change may be allowed up to 12 hours before departure on selected services."
+    ]
+  }
+};
+
+function FooterInfoModal({ modalKey, onClose }) {
+  const content = footerModalContent[modalKey] || footerModalContent.about;
   useEffect(() => {
     document.body.classList.add("modal-open");
     return () => document.body.classList.remove("modal-open");
@@ -1574,28 +1827,22 @@ function CancellationPolicyModal({ onClose }) {
       <article className="policy-modal" onClick={(event) => event.stopPropagation()}>
         <div className="policy-modal-head">
           <div>
-            <span>Cancellation & Refunds</span>
-            <h2 id="policy-title">Orbita Travels cancellation policy</h2>
+            <span>{content.eyebrow}</span>
+            <h2 id="policy-title">{content.title}</h2>
           </div>
           <button type="button" className="policy-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
         </div>
         <div className="policy-modal-body">
-          <p>Orbita Travels follows standard operator cancellation rules to keep refunds fair and transparent for every booking.</p>
-          <table>
-            <tbody>
-              <tr><th>Cancellation window</th><th>Refund</th></tr>
-              {cancellationPolicyRows.map(([window, refund]) => <tr key={window}><td>{window}</td><td>{refund}</td></tr>)}
-            </tbody>
-          </table>
-          <ul>
-            <li>Cancel more than 24 hours before departure to receive up to 90% of the base fare.</li>
-            <li>Partial refunds apply for cancellations made between 6 and 24 hours before departure.</li>
-            <li>No refund is provided for no-shows or cancellations within 6 hours of departure.</li>
-            <li>Convenience and payment gateway charges are non-refundable.</li>
-            <li>Approved refunds are processed within 5–7 working days to the original payment method.</li>
-            <li>Operator cancellations qualify for a full refund or free rescheduling.</li>
-            <li>One free date change may be allowed up to 12 hours before departure on selected services.</li>
-          </ul>
+          <p>{content.intro}</p>
+          {content.table && (
+            <table>
+              <tbody>
+                <tr>{content.table.headers.map((header) => <th key={header}>{header}</th>)}</tr>
+                {content.table.rows.map((row) => <tr key={row.join("-")}>{row.map((cell) => <td key={cell}>{cell}</td>)}</tr>)}
+              </tbody>
+            </table>
+          )}
+          <ul>{content.bullets.map((item) => <li key={item}>{item}</li>)}</ul>
         </div>
       </article>
     </div>
@@ -1604,14 +1851,15 @@ function CancellationPolicyModal({ onClose }) {
 
 function Footer({ setPage }) {
   const [footerTab, setFooterTab] = useState("routes");
-  const [showPolicy, setShowPolicy] = useState(false);
+  const [activeFooterModal, setActiveFooterModal] = useState(null);
   const activeLinks = footerRouteTabs[footerTab].links;
+  const openFooterModal = (key) => setActiveFooterModal(key);
 
   return (
     <>
       <footer className="site-footer">
         <div className="footer-top">
-          <Logo />
+          <img className="footer-logo" src={footerLogo} alt="Orbita Travels logo" />
           <p className="footer-tagline">Comfortable journeys, handpicked stays and memorable holidays across India.</p>
         </div>
 
@@ -1629,32 +1877,32 @@ function Footer({ setPage }) {
 
         <div className="footer-important-links">
           {[
-            ["bus", "Home"],
-            ["packages", "Offers"],
-            ["support", "About"],
-            ["support", "Contact"],
-            ["support", "FAQ's"],
-            ["policy", "Terms"],
-            ["policy", "Privacy"],
-            ["support", "Responsible Disclosure"],
-            ["support", "Operators"],
-            ["bus", "Routes"],
-            ["support", "Careers"],
-            ["support", "Our Management"],
-            ["support", "Investors Relations"]
-          ].map(([page, label]) => (
-            <button key={label} type="button" onClick={() => page === "policy" ? setShowPolicy(true) : setPage(page)}>{label}</button>
+            ["home", "Home"],
+            ["offers", "Offers"],
+            ["about", "About"],
+            ["contact", "Contact"],
+            ["faqs", "FAQ's"],
+            ["terms", "Terms"],
+            ["privacy", "Privacy"],
+            ["disclosure", "Responsible Disclosure"],
+            ["operators", "Operators"],
+            ["routes", "Routes"],
+            ["careers", "Careers"],
+            ["management", "Our Management"],
+            ["investors", "Investors Relations"]
+          ].map(([key, label]) => (
+            <button key={label} type="button" onClick={() => openFooterModal(key)}>{label}</button>
           ))}
         </div>
 
         <div className="footer-bottom-bar">
           <span>Orbita Travels © {new Date().getFullYear()}. All brands are trademarks of their respective owners.</span>
           <div className="footer-legal">
-            <button type="button" onClick={() => setShowPolicy(true)}>Privacy</button>
-            <button type="button" onClick={() => setShowPolicy(true)}>Terms of Use</button>
-            <button type="button" onClick={() => setPage("support")}>Career</button>
-            <button type="button" onClick={() => setPage("support")}>Customer Service</button>
-            <button type="button" className="policy-link" onClick={() => setShowPolicy(true)}>Cancellation Policy</button>
+            <button type="button" onClick={() => openFooterModal("privacy")}>Privacy</button>
+            <button type="button" onClick={() => openFooterModal("termsOfUse")}>Terms of Use</button>
+            <button type="button" onClick={() => openFooterModal("career")}>Career</button>
+            <button type="button" onClick={() => openFooterModal("customerService")}>Customer Service</button>
+            <button type="button" className="policy-link" onClick={() => openFooterModal("cancellation")}>Cancellation Policy</button>
           </div>
           <div className="footer-social">
             {["f", "X", "in", "▶"].map((icon) => (
@@ -1663,7 +1911,7 @@ function Footer({ setPage }) {
           </div>
         </div>
       </footer>
-      {showPolicy && <CancellationPolicyModal onClose={() => setShowPolicy(false)} />}
+      {activeFooterModal && <FooterInfoModal modalKey={activeFooterModal} onClose={() => setActiveFooterModal(null)} />}
     </>
   );
 }

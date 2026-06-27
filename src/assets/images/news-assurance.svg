@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title">
+  <title>Assurance support illustration</title>
+  <defs>
+    <linearGradient id="bg" x1="25" y1="18" x2="135" y2="142" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#effffb"/>
+      <stop offset="1" stop-color="#d6f7ef"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="48" y1="34" x2="116" y2="130" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18b89e"/>
+      <stop offset="1" stop-color="#087464"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="36" fill="url(#bg)"/>
+  <path d="M80 31l43 16v30c0 28-17 49-43 60-26-11-43-32-43-60V47l43-16Z" fill="url(#shield)"/>
+  <path d="M60 80l14 14 29-34" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M45 64c-8 8-11 18-9 30M115 64c8 8 11 18 9 30" stroke="#b8efe5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="118" cy="42" r="15" fill="#fff" opacity=".72"/>
+  <circle cx="40" cy="124" r="18" fill="#fff" opacity=".72"/>
+</svg>
