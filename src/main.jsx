@@ -684,11 +684,23 @@ function buildDeckLayout(seats, berthLike) {
     row: seat.row - orientedMinRow + 1,
     column: seat.column - orientedMinColumn + 1
   }));
+  
+  // Normalize column numbers to be sequential (1, 2, 3, 4 instead of 1, 3, 5, 7)
+  const uniqueColumns = [...new Set(finalSeats.map((seat) => seat.column))].sort((a, b) => a - b);
+  const columnMap = {};
+  uniqueColumns.forEach((col, index) => {
+    columnMap[col] = index + 1;
+  });
+  const normalizedSeats = finalSeats.map((seat) => ({
+    ...seat,
+    column: columnMap[seat.column]
+  }));
+  
   const maxColumn = Math.max(
-    ...finalSeats.map(seat => seat.column + (seat.width || 1) - 1)
+    ...normalizedSeats.map(seat => seat.column + (seat.width || 1) - 1)
 );
-  const rows = [...new Set(finalSeats.map((seat) => seat.row))].sort((a, b) => a - b);
-  return { seats: finalSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
+  const rows = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
+  return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
 }
 
 function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, baseFare }) {
