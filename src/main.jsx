@@ -622,40 +622,51 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   const layoutType = String(route.seatLayout?.type || route.classType || "").toLowerCase();
   const isSleeper = layoutType.includes("sleeper");
   const isMixed = layoutType.includes("mixed") || layoutType.includes("sleeper-seater");
-  const seats = route.seatLayout?.seats || [];
+  
+  // Handle your API's SeatLayout structure - it returns SeatDetails as a 2D array
+  let seats = [];
+  if (route.seatLayout?.SeatDetails) {
+    // Flatten the 2D array from your API and map all properties
+    seats = route.seatLayout.SeatDetails.flat().map(seat => ({
+      ...seat,
+      id: seat.SeatName || seat.SeatIndex,
+      label: seat.SeatName,
+      deck: seat.IsUpper ? "upper" : "lower",
+      isWalkway: false
+    }));
+  } else {
+    // Fallback to the old structure if it exists
+    seats = route.seatLayout?.seats || [];
+  }
+  
   if (route.externalProvider === "bdsd" && !seats.length) {
     return <div className="empty-results">Seat layout is not available for this bus yet.</div>;
   }
-  const lower = buildDeckLayout(seats.filter((seat) => (isSleeper || isMixed ? seat.deck !== "upper" : true) && !seat.isWalkway), isSleeper || isMixed);
+  const lower = buildDeckLayout(seats.filter((seat) => seat.deck !== "upper" && !seat.isWalkway), isSleeper || isMixed);
   const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
-  const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);
-
-  const toggle = (id) => {
-    if (unavailable.has(id)) return;
-    setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
-  };
-
-  return (
-    <div className="portrait-chart-wrap">
-      <Deck title="Lower deck" layout={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />
-      {(isSleeper || isMixed) && upperSeats.length > 0 && <Deck title="Upper deck" layout={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
-      <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="female-seat">Women</span><span className="sold-seat">Sold</span></div>
-    </div>
-  );
-}
+  const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);}
 
 function buildDeckLayout(seats, berthLike) {
-  const fallbackCols = berthLike ? [1, 2, 3] : [1, 2, 3, 4];
+  const fallbackCols = berthLike ? [1, 2, 3] : [1, 2, 3, 4, 5, 6, 7]; // Support up to 7 columns as in your API
   const raw = seats.map((seat, index) => {
-    const hasCoordinates = Number.isFinite(Number(seat.row)) && Number.isFinite(Number(seat.column));
+    // Map your API's property names to what the code expects
+    // Your API uses: ColumnNo, RowNo, Height, Width, SeatType
+    const apiColumn = Number(seat.ColumnNo || seat.column);
+    const apiRow = Number(seat.RowNo || seat.row);
+    const apiHeight = Number(seat.Height || seat.height || 1);
+    const apiWidth = Number(seat.Width || seat.width || 1);
+    const hasCoordinates = Number.isFinite(apiColumn) && Number.isFinite(apiRow);
     const fallbackRow = Math.floor(index / fallbackCols.length) + 1;
     const fallbackColumn = fallbackCols[index % fallbackCols.length];
+    
+    // Use API's height values directly - don't force berth height=2
     return {
       ...seat,
-      row: hasCoordinates ? Number(seat.row) : fallbackRow,
-      column: hasCoordinates ? Number(seat.column) : fallbackColumn,
-      width: Math.max(1, Number(seat.width || 1)),
-      height: Math.max(1, Number(seat.height || (seat.isBerth ? 2 : 1)))
+      row: hasCoordinates ? apiRow : fallbackRow,
+      column: hasCoordinates ? apiColumn : fallbackColumn,
+      width: Math.max(1, apiWidth),
+      height: Math.max(1, apiHeight),
+      isBerth: apiHeight > 1 // Set isBerth based on API's Height value
     };
   });
   const minRow = Math.min(...raw.map((seat) => seat.row));
@@ -665,18 +676,8 @@ function buildDeckLayout(seats, berthLike) {
     row: seat.row + (minRow === 0 ? 1 : 0),
     column: seat.column + (minColumn === 0 ? 1 : 0)
   }));
-  const rowCount = new Set(prepared.map((seat) => seat.row)).size;
-  const columnCount = new Set(prepared.map((seat) => seat.column)).size;
-  const shouldRotate = !berthLike && columnCount > rowCount;
-  const oriented = shouldRotate
-    ? prepared.map((seat) => ({
-      ...seat,
-      row: seat.column,
-      column: seat.row,
-      width: Math.max(1, Number(seat.height || 1)),
-      height: 1
-    }))
-    : prepared;
+  // NEVER rotate - always maintain portrait orientation (fixes landscape issue)
+  const oriented = prepared;
   const orientedMinRow = Math.min(...oriented.map((seat) => seat.row));
   const orientedMinColumn = Math.min(...oriented.map((seat) => seat.column));
   const finalSeats = oriented.map((seat) => ({
@@ -707,14 +708,17 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
   const renderSeat = (seat, index) => {
     const sold = unavailable.has(seat.id);
     const chosen = selected.includes(seat.id);
-    const women = seat.ladies || index % 7 === 2;
-    const berth = Boolean((sleeper || mixed) && seat.isBerth);
-    const fare = Number(seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
+    // Check API's IsLadiesSeat property from your JSON response
+    const women = seat.IsLadiesSeat || seat.ladies || index % 7 === 2;
+    // Show as chair (Armchair) if height=1 (SEAT), berth only if height>1 (BERTH)
+    const isBerth = seat.height > 1 || seat.isBerth;
+    // Use API's SeatFare or Price.OfferedPrice from your JSON
+    const fare = Number(seat.SeatFare || seat.Price?.OfferedPrice || seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
 
     return (
       <button
         key={seat.id}
-        className={`${berth ? "sleeper-berth" : "chair-seat"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
+        className={`${isBerth ? "sleeper-berth" : "chair-seat"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
         onClick={() => toggle(seat.id)}
         aria-label={`${title} seat ${seat.id}`}
         style={{
@@ -726,8 +730,8 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
     justifySelf: "stretch"
 }}
       >
-        <b>{seat.label || seat.id}</b>
-        {berth ? <span className="pillow" /> : <Armchair size={17} />}
+        <b>{seat.SeatName || seat.label || seat.id}</b>
+        {isBerth ? <span className="pillow" /> : <Armchair size={17} />}
         <small>{sold ? "Sold" : `₹${fare}`}</small>
       </button>
     );
