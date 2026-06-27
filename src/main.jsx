@@ -617,35 +617,6 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   );
 }
 
-function PortraitSeatChart({ route, selected, setSelected }) {
-  const unavailable = new Set(route.seatLayout?.unavailable || []);
-  const layoutType = String(route.seatLayout?.type || route.classType || "").toLowerCase();
-  const isSleeper = layoutType.includes("sleeper");
-  const isMixed = layoutType.includes("mixed") || layoutType.includes("sleeper-seater");
-  
-  // Handle your API's SeatLayout structure - it returns SeatDetails as a 2D array
-  let seats = [];
-  if (route.seatLayout?.SeatDetails) {
-    // Flatten the 2D array from your API and map all properties
-    seats = route.seatLayout.SeatDetails.flat().map(seat => ({
-      ...seat,
-      id: seat.SeatName || seat.SeatIndex,
-      label: seat.SeatName,
-      deck: seat.IsUpper ? "upper" : "lower",
-      isWalkway: false
-    }));
-  } else {
-    // Fallback to the old structure if it exists
-    seats = route.seatLayout?.seats || [];
-  }
-  
-  if (route.externalProvider === "bdsd" && !seats.length) {
-    return <div className="empty-results">Seat layout is not available for this bus yet.</div>;
-  }
-  const lower = buildDeckLayout(seats.filter((seat) => seat.deck !== "upper" && !seat.isWalkway), isSleeper || isMixed);
-  const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
-  const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);}
-
 function buildDeckLayout(seats, berthLike) {
   const fallbackCols = berthLike ? [1, 2, 3] : [1, 2, 3, 4, 5, 6, 7]; // Support up to 7 columns as in your API
   const raw = seats.map((seat, index) => {
@@ -702,6 +673,49 @@ function buildDeckLayout(seats, berthLike) {
 );
   const rows = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
+}
+
+function PortraitSeatChart({ route, selected, setSelected }) {
+  const unavailable = new Set(route.seatLayout?.unavailable || []);
+  const layoutType = String(route.seatLayout?.type || route.classType || "").toLowerCase();
+  const isSleeper = layoutType.includes("sleeper");
+  const isMixed = layoutType.includes("mixed") || layoutType.includes("sleeper-seater");
+  
+  // Handle your API's SeatLayout structure - it returns SeatDetails as a 2D array
+  let seats = [];
+  if (route.seatLayout?.SeatDetails) {
+    // Flatten the 2D array from your API and map all properties
+    seats = route.seatLayout.SeatDetails.flat().map(seat => ({
+      ...seat,
+      id: seat.SeatName || seat.SeatIndex,
+      label: seat.SeatName,
+      deck: seat.IsUpper ? "upper" : "lower",
+      isWalkway: false
+    }));
+  } else {
+    // Fallback to the old structure if it exists
+    seats = route.seatLayout?.seats || [];
+  }
+  
+  if (route.externalProvider === "bdsd" && !seats.length) {
+    return <div className="empty-results">Seat layout is not available for this bus yet.</div>;
+  }
+  const lower = buildDeckLayout(seats.filter((seat) => seat.deck !== "upper" && !seat.isWalkway), isSleeper || isMixed);
+  const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
+  const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);
+
+  const toggle = (id) => {
+    if (unavailable.has(id)) return;
+    setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
+  };
+
+  return (
+    <div className="portrait-chart-wrap">
+      <Deck title="Lower deck" layout={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />
+      {(isSleeper || isMixed) && upperSeats.length > 0 && <Deck title="Upper deck" layout={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
+      <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="female-seat">Women</span><span className="sold-seat">Sold</span></div>
+    </div>
+  );
 }
 
 function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, baseFare }) {
