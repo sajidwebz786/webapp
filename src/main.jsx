@@ -631,7 +631,9 @@ function numberFrom(...values) {
 
 function extractSeatList(seatLayout) {
   if (!seatLayout) return [];
-  const source = seatLayout.SeatDetails || seatLayout.Seats || seatLayout.SeatLayout || seatLayout.seats || [];
+  const result = seatLayout.Result || {};
+  const layoutObject = seatLayout.SeatLayout && !Array.isArray(seatLayout.SeatLayout) ? seatLayout.SeatLayout : result.SeatLayout || {};
+  const source = seatLayout.SeatDetails || seatLayout.Seats || seatLayout.seats || layoutObject.SeatDetails || layoutObject.Seats || (Array.isArray(seatLayout.SeatLayout) ? seatLayout.SeatLayout : []);
   return Array.isArray(source) ? source.flat(Infinity).filter((seat) => seat && typeof seat === "object") : [];
 }
 
@@ -673,16 +675,29 @@ function buildDeckLayout(seats) {
   const measuredSeats = seats.map(normalizeApiSeat).filter(Boolean);
   if (!measuredSeats.length) return { seats: [], rows: [], columns: 0 };
 
-  const minRow = Math.min(...measuredSeats.map((seat) => seat.row));
-  const minColumn = Math.min(...measuredSeats.map((seat) => seat.column));
-  const normalizedSeats = measuredSeats.map((seat) => ({
+  const rawRows = [...new Set(measuredSeats.map((seat) => seat.row))].sort((a, b) => a - b);
+  const rawColumns = [...new Set(measuredSeats.map((seat) => seat.column))].sort((a, b) => a - b);
+  const shouldRotateLandscape = rawColumns.length > rawRows.length + 2 && rawColumns.length > 5;
+  const orientedSeats = measuredSeats.map((seat) => shouldRotateLandscape ? {
     ...seat,
-    row: seat.row - minRow + 1,
-    column: seat.column - minColumn + 1
+    row: seat.column,
+    column: seat.row,
+    width: seat.height || 1,
+    height: seat.width || 1
+  } : seat);
+
+  const rowTracks = [...new Set(orientedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
+  const columnTracks = [...new Set(orientedSeats.map((seat) => seat.column))].sort((a, b) => a - b);
+  const rowMap = new Map(rowTracks.map((row, index) => [row, index + 1]));
+  const columnMap = new Map(columnTracks.map((column, index) => [column, index + 1]));
+  const normalizedSeats = orientedSeats.map((seat) => ({
+    ...seat,
+    row: rowMap.get(seat.row) || 1,
+    column: columnMap.get(seat.column) || 1
   }));
   const rows = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   const columns = Math.max(...normalizedSeats.map((seat) => seat.column + (seat.width || 1) - 1));
-  return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns };
+  return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns, rotated: shouldRotateLandscape };
 }
 
 function PortraitSeatChart({ route, selected, setSelected }) {
@@ -755,17 +770,19 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
   };
 
   return (
-    <article className="deck-card">
+    <article className={`deck-card ${layout.rotated ? "rotated-layout" : ""}`}>
       <div className="deck-head"><h3>{title}</h3><span>Driver</span></div>
       <div className="bus-front-marker"><i /> <b>FRONT OF VEHICLE</b></div>
       <div className="vehicle-icons"><span>WC</span><span>Door</span></div>
-      <div className="portrait-seat-grid live-seat-grid" style={{
-        gridTemplateColumns: `repeat(${layout.columns || 4}, 44px)`,
-        gridAutoRows: "44px",
-        gap: "2px",
-        justifyContent: "center",
-      }}>
-        {layout.seats.map(renderSeat)}
+      <div className="deck-seat-scroll" aria-label={`${title} seat layout`}>
+        <div className="portrait-seat-grid live-seat-grid" style={{
+          gridTemplateColumns: `repeat(${layout.columns || 4}, 46px)`,
+          gridAutoRows: "46px",
+          gap: "8px",
+          justifyContent: "center",
+        }}>
+          {layout.seats.map(renderSeat)}
+        </div>
       </div>
       <div className="rear-marker">REAR</div>
     </article>
@@ -1201,7 +1218,8 @@ function LoginInline({ setUser }) {
 
 function SeatMap({ route, selected, setSelected }) {
   const unavailable = new Set(route.seatLayout?.unavailable || []);
-  const seats = extractSeatList(route.seatLayout).map(normalizeApiSeat).filter(Boolean);
+  const layout = buildDeckLayout(extractSeatList(route.seatLayout));
+  const seats = layout.seats;
   if (!route.seatLayout || !seats.length) return <div className="empty-results">No seats to show for this bus.</div>;
   const toggle = (id) => {
     if (unavailable.has(id)) return;
@@ -1210,7 +1228,7 @@ function SeatMap({ route, selected, setSelected }) {
   return (
     <div className="seat-landscape">
       <div className={`seat-map ${route.type}`} style={{
-        gridTemplateColumns: `repeat(${Math.max(...seats.map((seat) => seat.column + (seat.width || 1) - 1))}, 58px)`,
+        gridTemplateColumns: `repeat(${layout.columns || 4}, 58px)`,
         gridTemplateRows: `repeat(${Math.max(...seats.map((seat) => seat.row + (seat.height || 1) - 1))}, 48px)`
       }}>
         {seats.map((seat) => {
