@@ -552,15 +552,18 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   useEffect(() => {
     const selectedRoute = activeJourney?.route;
     if (!selectedRoute?.id) return;
-    setLiveRoute(selectedRoute);
+    setLiveRoute({ ...selectedRoute, seatLayout: null, seatLayoutLoading: true, seatLayoutError: false });
     setLivePoints(null);
+    setSelectedSeats([]);
     if (selectedRoute.type !== "bus") {
       setStep("passenger");
       return;
     }
     api(`/transport/${selectedRoute.type}/${selectedRoute.id}/seats`).then((seatLayout) => {
-      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout }));
-    }).catch(() => {});
+      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout, seatLayoutLoading: false, seatLayoutError: false }));
+    }).catch(() => {
+      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout: null, seatLayoutLoading: false, seatLayoutError: true }));
+    });
     api(`/transport/${selectedRoute.type}/${selectedRoute.id}/points`).then(setLivePoints).catch(() => {});
   }, [activeJourney?.route?.id]);
 
@@ -617,63 +620,69 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   );
 }
 
-function buildDeckLayout(seats, berthLike) {
-  const fallbackCols = berthLike ? [1, 2, 3] : [1, 2, 3, 4, 5, 6, 7];
-  const raw = seats.map((seat, index) => {
-    const apiColumn = Number(seat.ColumnNo || seat.column);
-    const apiRow = Number(seat.RowNo || seat.row);
-    const apiHeight = Number(seat.Height || seat.height || 1);
-    const apiWidth = Number(seat.Width || seat.width || 1);
-    const hasCoordinates = Number.isFinite(apiColumn) && Number.isFinite(apiRow);
-    const fallbackRow = Math.floor(index / fallbackCols.length) + 1;
-    const fallbackColumn = fallbackCols[index % fallbackCols.length];
-    
-    return {
-      ...seat,
-      row: hasCoordinates ? apiRow : fallbackRow,
-      column: hasCoordinates ? apiColumn : fallbackColumn,
-      width: Math.max(1, apiWidth),
-      height: Math.max(1, apiHeight),
-      isBerth: apiHeight > 1
-    };
-  });
-  const minRow = Math.min(...raw.map((seat) => seat.row));
-  const minColumn = Math.min(...raw.map((seat) => seat.column));
-  const prepared = raw.map((seat) => ({
-    ...seat,
-    row: seat.row + (minRow === 0 ? 1 : 0),
-    column: seat.column + (minColumn === 0 ? 1 : 0)
-  }));
-
-  if (!seats.length) {
-    console.error("❌ No seats found - check the API response structure!");
-    return { seats: [], rows: [], columns: 0 };
+function numberFrom(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
   }
+  return null;
+}
 
-  const oriented = prepared;
-  const orientedMinRow = Math.min(...oriented.map((seat) => seat.row));
-  const orientedMinColumn = Math.min(...oriented.map((seat) => seat.column));
-  const finalSeats = oriented.map((seat) => ({
+function extractSeatList(seatLayout) {
+  if (!seatLayout) return [];
+  const source = seatLayout.SeatDetails || seatLayout.Seats || seatLayout.SeatLayout || seatLayout.seats || [];
+  return Array.isArray(source) ? source.flat(Infinity).filter((seat) => seat && typeof seat === "object") : [];
+}
+
+function seatVisualType(seat, rawType) {
+  const type = String(rawType || seat.rawType || seat.SeatType || seat.Type || seat.BerthType || "").toLowerCase();
+  const htmlClass = String(seat.htmlClass || seat.className || "").toLowerCase();
+  if (seat.visualType) return seat.visualType;
+  if (type.includes("sleeper") || type.includes("berth") || htmlClass.includes("sleeper") || htmlClass.includes("berth")) return "berth";
+  if (/\bb?hseat\b/.test(htmlClass) || type.includes("horizontal") || type === "2") return "horizontal-seat";
+  return "seat";
+}
+
+function normalizeApiSeat(seat, index) {
+  const column = numberFrom(seat.ColumnNo, seat.Column, seat.column, seat.X, seat.x, seat.ColumnIndex);
+  const row = numberFrom(seat.RowNo, seat.Row, seat.row, seat.Y, seat.y, seat.RowIndex);
+  if (!Number.isFinite(column) || !Number.isFinite(row)) return null;
+  const width = Math.max(1, numberFrom(seat.Width, seat.SeatWidth, seat.width, seat.w) || 1);
+  const height = Math.max(1, numberFrom(seat.Height, seat.SeatHeight, seat.height, seat.h) || 1);
+  const isUpper = Boolean(seat.IsUpper || seat.Upper || seat.IsUpperDeck || String(seat.Deck || seat.deck || "").toLowerCase().includes("upper") || String(seat.DeckNo || "").toLowerCase() === "1");
+  const id = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.id || seat.SeatIndex || index + 1);
+  const rawType = String(seat.SeatType || seat.Type || seat.BerthType || seat.rawType || "").toLowerCase();
+  const visualType = seatVisualType(seat, rawType);
+  return {
     ...seat,
-    row: seat.row - orientedMinRow + 1,
-    column: seat.column - orientedMinColumn + 1
-  }));
-  
-  const uniqueColumns = [...new Set(finalSeats.map((seat) => seat.column))].sort((a, b) => a - b);
-  const columnMap = {};
-  uniqueColumns.forEach((col, index) => {
-    columnMap[col] = index + 1;
-  });
-  const normalizedSeats = finalSeats.map((seat) => ({
+    id,
+    label: seat.SeatName || seat.label || id,
+    deck: isUpper ? "upper" : "lower",
+    row,
+    column,
+    width,
+    height,
+    isBerth: Boolean(seat.isBerth || visualType === "berth"),
+    visualType,
+    isWalkway: Boolean(seat.isWalkway || seat.IsWalkway)
+  };
+}
+
+function buildDeckLayout(seats) {
+  const measuredSeats = seats.map(normalizeApiSeat).filter(Boolean);
+  if (!measuredSeats.length) return { seats: [], rows: [], columns: 0 };
+
+  const minRow = Math.min(...measuredSeats.map((seat) => seat.row));
+  const minColumn = Math.min(...measuredSeats.map((seat) => seat.column));
+  const normalizedSeats = measuredSeats.map((seat) => ({
     ...seat,
-    column: columnMap[seat.column]
+    row: seat.row - minRow + 1,
+    column: seat.column - minColumn + 1
   }));
-  
-  const maxColumn = Math.max(
-    ...normalizedSeats.map(seat => seat.column + (seat.width || 1) - 1)
-  );
   const rows = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
-  return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns: maxColumn };
+  const columns = Math.max(...normalizedSeats.map((seat) => seat.column + (seat.width || 1) - 1));
+  return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns };
 }
 
 function PortraitSeatChart({ route, selected, setSelected }) {
@@ -681,26 +690,24 @@ function PortraitSeatChart({ route, selected, setSelected }) {
   const layoutType = String(route.seatLayout?.type || route.classType || "").toLowerCase();
   const isSleeper = layoutType.includes("sleeper");
   const isMixed = layoutType.includes("mixed") || layoutType.includes("sleeper-seater");
-  
-  let seats = [];
-  if (route.seatLayout?.SeatDetails) {
-    seats = route.seatLayout.SeatDetails.flat().map(seat => ({
-      ...seat,
-      id: seat.SeatName || seat.SeatIndex,
-      label: seat.SeatName,
-      deck: seat.IsUpper ? "upper" : "lower",
-      isWalkway: false
-    }));
-  } else {
-    seats = route.seatLayout?.seats || [];
+
+  if (route.seatLayoutLoading) {
+    return <div className="empty-results">Loading live seat layout...</div>;
   }
-  
-  if (route.externalProvider === "bdsd" && !seats.length) {
-    return <div className="empty-results">Seat layout is not available for this bus yet.</div>;
+
+  const apiSeats = extractSeatList(route.seatLayout).map(normalizeApiSeat).filter(Boolean);
+  const visibleSeats = apiSeats.filter((seat) => !seat.isWalkway);
+  if (route.seatLayoutError || !route.seatLayout || !visibleSeats.length) {
+    return <div className="empty-results">No seats to show for this bus.</div>;
   }
-  const lower = buildDeckLayout(seats.filter((seat) => seat.deck !== "upper" && !seat.isWalkway), isSleeper || isMixed);
-  const upperSeats = seats.filter((seat) => seat.deck === "upper" && !seat.isWalkway);
-  const upper = buildDeckLayout(upperSeats, isSleeper || isMixed);
+
+  const lowerSeats = visibleSeats.filter((seat) => seat.deck !== "upper");
+  const upperSeats = visibleSeats.filter((seat) => seat.deck === "upper");
+  const lower = buildDeckLayout(lowerSeats);
+  const upper = buildDeckLayout(upperSeats);
+  if (!lower.seats.length && !upper.seats.length) {
+    return <div className="empty-results">No seats to show for this bus.</div>;
+  }
 
   const toggle = (id) => {
     if (unavailable.has(id)) return;
@@ -709,25 +716,26 @@ function PortraitSeatChart({ route, selected, setSelected }) {
 
   return (
     <div className="portrait-chart-wrap">
-      <Deck title="Lower deck" layout={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />
-      {(isSleeper || isMixed) && upperSeats.length > 0 && <Deck title="Upper deck" layout={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
+      {lower.seats.length > 0 && <Deck title="Lower deck" layout={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
+      {upper.seats.length > 0 && <Deck title="Upper deck" layout={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
       <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="female-seat">Women</span><span className="sold-seat">Sold</span></div>
     </div>
   );
 }
 
 function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, baseFare }) {
-  const renderSeat = (seat, index) => {
+  const renderSeat = (seat) => {
     const sold = unavailable.has(seat.id);
     const chosen = selected.includes(seat.id);
-    const women = seat.IsLadiesSeat || seat.ladies || index % 7 === 2;
-    const isBerth = seat.height > 1 || seat.isBerth;
+    const women = Boolean(seat.IsLadiesSeat || seat.ladies);
+    const isBerth = Boolean(seat.isBerth);
+    const isHorizontalSeat = !isBerth && seat.visualType === "horizontal-seat";
     const fare = Number(seat.SeatFare || seat.Price?.OfferedPrice || seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
     
     return (
       <button
         key={seat.id}
-        className={`${isBerth ? "sleeper-berth" : "chair-seat"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
+        className={`${isBerth ? "sleeper-berth" : "chair-seat"} ${isHorizontalSeat ? "horizontal-seat" : ""} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
         onClick={() => toggle(seat.id)}
         aria-label={`${title} seat ${seat.id}`}
         style={{
@@ -1193,24 +1201,28 @@ function LoginInline({ setUser }) {
 
 function SeatMap({ route, selected, setSelected }) {
   const unavailable = new Set(route.seatLayout?.unavailable || []);
-  const seats = route.seatLayout?.seats || [];
-  if (route.externalProvider === "bdsd" && !seats.length) {
-    return <div className="empty-results">Seat layout is not available for this bus yet.</div>;
-  }
+  const seats = extractSeatList(route.seatLayout).map(normalizeApiSeat).filter(Boolean);
+  if (!route.seatLayout || !seats.length) return <div className="empty-results">No seats to show for this bus.</div>;
   const toggle = (id) => {
     if (unavailable.has(id)) return;
     setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
   };
   return (
     <div className="seat-landscape">
-      <div className={`seat-map ${route.type}`}>
+      <div className={`seat-map ${route.type}`} style={{
+        gridTemplateColumns: `repeat(${Math.max(...seats.map((seat) => seat.column + (seat.width || 1) - 1))}, 58px)`,
+        gridTemplateRows: `repeat(${Math.max(...seats.map((seat) => seat.row + (seat.height || 1) - 1))}, 48px)`
+      }}>
         {seats.map((seat) => {
           if (seat.isWalkway) {
             return <div key={seat.id} className="seat-walkway-landscape" />;
           }
           return (
-            <button key={seat.id} className={`${unavailable.has(seat.id) ? "blocked" : ""} ${selected.includes(seat.id) ? "chosen" : ""}`} onClick={() => toggle(seat.id)}>
-              {route.seatLayout?.type === "sleeper" ? <BedDouble size={15} /> : <Armchair size={15} />}
+            <button key={seat.id} className={`${unavailable.has(seat.id) ? "blocked" : ""} ${selected.includes(seat.id) ? "chosen" : ""}`} onClick={() => toggle(seat.id)} style={{
+              gridColumn: `${seat.column} / span ${seat.width || 1}`,
+              gridRow: `${seat.row} / span ${seat.height || 1}`
+            }}>
+              {seat.isBerth ? <BedDouble size={15} /> : <Armchair size={15} />}
               <span>{seat.id}</span>
             </button>
           );

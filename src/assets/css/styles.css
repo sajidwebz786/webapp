@@ -711,6 +711,19 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .seater-grid { grid-template-columns: repeat(4, 36px); }
 .sleeper-grid, .mixed-grid { grid-template-columns: 46px 34px 46px 46px; align-items: start; }
 .live-seat-grid { max-width: 100%; margin: 0 auto; }
+.live-seat-grid .chair-seat,
+.live-seat-grid .sleeper-berth {
+  width: 100%;
+  height: 100%;
+  min-width: 40px;
+  min-height: 40px;
+}
+.live-seat-grid .chair-seat.horizontal-seat {
+  min-height: 72px;
+}
+.live-seat-grid .sleeper-berth {
+  min-height: 90px;
+}
 .walkway { width: 34px; height: 66px; background: transparent; border: 0; }
 .walkway::before,
 .walkway::after { content: ""; }
@@ -1057,6 +1070,10 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .chair-seat {
   background: #e8f5e9;
   border: 1px solid #4caf50;
+}
+.chair-seat.horizontal-seat {
+  background: #e8f5e9;
+  border-color: #4caf50;
 }
 .sleeper-berth {
   background: #fff3e0;
