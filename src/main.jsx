@@ -433,9 +433,13 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
       const params = new URLSearchParams({ from: query.from, to: query.to, date: query.date, tripType: query.tripType });
       const data = await api(`/transport/${type}/search?${params}`);
       setResults(data);
+      if (!data.length && !silent) setMessage(`No ${type === "bus" ? "bus" : type} services returned for this route/date. Try another date or route.`);
       if (!silent) {
         window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
       }
+    } catch (error) {
+      setResults([]);
+      setMessage(error.message || `Unable to search ${type} services right now.`);
     } finally {
       setSearching(false);
     }
@@ -731,10 +735,31 @@ function PortraitSeatChart({ route, selected, setSelected }) {
 
   return (
     <div className="portrait-chart-wrap">
-      {lower.seats.length > 0 && <Deck title="Lower deck" layout={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
-      {upper.seats.length > 0 && <Deck title="Upper deck" layout={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />}
+      <div className="deck-lane">
+        {lower.seats.length > 0
+          ? <Deck title="Lower deck" layout={lower} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />
+          : <DeckPlaceholder title="Lower deck" />}
+      </div>
+      <div className="deck-lane">
+        {upper.seats.length > 0
+          ? <Deck title="Upper deck" layout={upper} unavailable={unavailable} selected={selected} toggle={toggle} sleeper={isSleeper} mixed={isMixed} baseFare={route.price} />
+          : <DeckPlaceholder title="Upper deck" />}
+      </div>
       <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="female-seat">Women</span><span className="sold-seat">Sold</span></div>
     </div>
+  );
+}
+
+function DeckPlaceholder({ title }) {
+  return (
+    <article className="deck-card deck-placeholder" aria-label={`${title} not available`}>
+      <div className="deck-head"><h3>{title}</h3><span>Empty</span></div>
+      <div className="deck-empty-state">
+        <Armchair size={22} />
+        <b>No deck in API response</b>
+        <small>This lane is reserved so single-deck buses do not stretch across the full seat area.</small>
+      </div>
+    </article>
   );
 }
 

@@ -698,7 +698,8 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .window-offer { border-radius: 8px; padding: 10px 14px; background: #ffdb82; color: #111827; font-weight: 850; text-align: center; }
 .booking-tabs { position: sticky; top: 82px; z-index: 13; margin: 0; }
 .dedicated-seat-screen { width: calc(100% - 24px); max-width: 1280px; margin: 18px auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 0.36fr); gap: 16px; align-items: start; min-width: 0; }
-.portrait-chart-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; min-width: 0; }
+.portrait-chart-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; min-width: 0; }
+.deck-lane { min-width: 0; width: 100%; }
 .deck-card { background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 22px 18px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; overflow: hidden; }
 .deck-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .deck-head h3 { margin: 0; font-size: 15px; }
@@ -743,6 +744,10 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .chair-seat.sold, .sleeper-berth.sold { border-color: #dedee7; background: #ececf2; color: #b2b4bf; cursor: not-allowed; box-shadow: none; }
 .chair-seat.sold small, .sleeper-berth.sold small { color: #b2b4bf; }
 .rear-marker { margin-top: 22px; padding-top: 18px; border-top: 1px dashed #d8deea; color: #b7bdc8; text-align: center; font-weight: 900; letter-spacing: .22em; }
+.deck-placeholder { min-height: 360px; display: grid; grid-template-rows: auto 1fr; opacity: .72; }
+.deck-empty-state { min-height: 260px; display: grid; place-items: center; align-content: center; gap: 8px; border: 1px dashed #d5dcea; border-radius: 12px; background: #f8fafc; color: #778296; text-align: center; padding: 20px; }
+.deck-empty-state b { color: #475569; font-size: 14px; }
+.deck-empty-state small { max-width: 220px; line-height: 1.45; }
 .vibrant { grid-column: 1 / -1; background: white; border-radius: 14px; padding: 14px; box-shadow: 0 10px 24px rgba(20, 36, 65, .08); }
 .seat-legend .female-seat:before { background: #fff1f8; border-color: #ff51a8; }
 .bus-profile-panel { background: white; border-radius: 18px; overflow: hidden; box-shadow: 0 14px 30px rgba(20, 36, 65, .09); }
@@ -1006,7 +1011,7 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 
 @media (max-width: 1080px) {
   .dedicated-seat-screen, .passenger-screen { grid-template-columns: 1fr; width: calc(100% - 24px); margin: 18px auto; }
-  .portrait-chart-wrap { grid-template-columns: 1fr; }
+  .portrait-chart-wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .booking-page { padding: 0 12px 84px; }
   .deck-card, .bus-profile-panel { width: 100%; overflow: hidden; }
   .hero-art { min-height: 520px; padding-bottom: 92px; }
@@ -1047,7 +1052,7 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
   .booking-route-title { font-size: 17px; }
   .window-offer { grid-column: 1 / -1; justify-self: start; padding: 8px 12px; font-size: 13px; }
   .booking-tabs { top: 67px; }
-  .portrait-chart-wrap { grid-template-columns: 1fr; }
+  .portrait-chart-wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .deck-card { min-height: auto; }
   .deck-seat-scroll { overflow-x: auto; }
   h1 { font-size: 38px; }
