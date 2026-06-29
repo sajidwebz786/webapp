@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronDown, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
+import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronDown, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, Menu, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
 import { API_URL, api, tokenStore } from "./services/api";
 import { Logo } from "./components/Logo";
 import apsrtcLogo from "./assets/images/apsrtc-logo.png";
@@ -296,24 +296,35 @@ function App() {
 }
 
 function TopNav({ page, setPage, user, setUser }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const goToPage = (nextPage) => {
+    setPage(nextPage);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <header className="top-shell">
+    <header className={`top-shell ${mobileMenuOpen ? "mobile-open" : ""}`}>
       <nav className="top-nav">
-        <button className="brand-button" onClick={() => setPage("bus")}><Logo /></button>
+        <div className="mobile-brand-row">
+          <button className="brand-button" onClick={() => goToPage("bus")}><Logo /></button>
+          <button className="hamburger-button" type="button" aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((open) => !open)}>
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
         <div className="service-nav">
           {services.map(({ key, label, icon: Icon }) => (
-            <button key={key} className={page === key ? "active" : ""} onClick={() => setPage(key)}>
+            <button key={key} className={page === key ? "active" : ""} onClick={() => goToPage(key)}>
               <Icon size={24} /><span>{label}</span>
             </button>
           ))}
         </div>
         <div className="utility-nav">
-          <button onClick={() => setPage(user ? "dashboard" : "auth")}><CalendarDays size={20} /> Bookings</button>
-          <button onClick={() => setPage("support")}><Headphones size={20} /> Help</button>
+          <button onClick={() => goToPage(user ? "dashboard" : "auth")}><CalendarDays size={20} /> Bookings</button>
+          <button onClick={() => goToPage("support")}><Headphones size={20} /> Help</button>
           {user ? (
-            <button onClick={() => { tokenStore.clear(); setUser(null); setPage("auth"); }}><LogOut size={20} /> Logout</button>
+            <button onClick={() => { tokenStore.clear(); setUser(null); goToPage("auth"); }}><LogOut size={20} /> Logout</button>
           ) : (
-            <button onClick={() => setPage("auth")}><UserRound size={20} /> Account</button>
+            <button onClick={() => goToPage("auth")}><UserRound size={20} /> Account</button>
           )}
         </div>
       </nav>
@@ -1299,10 +1310,9 @@ function PassengerForm({ query, selectedSeats, passengers, setPassengers, contac
 
 function OffersStrip() {
   const offers = [
-    { icon: Bus, label: "Bus", title: "Premium bus journeys", detail: "Reserved seats, clean coaches and smart boarding alerts.", code: "FIRST", kicker: "Up to 18% off" },
-    { icon: Train, label: "Train", title: "Flexible date support", detail: "Switch eligible travel dates without the usual friction.", code: "FLEXI", kicker: "Free change" },
-    { icon: Plane, label: "Flight", title: "Smart weekday fares", detail: "Low-demand windows surfaced for faster planning.", code: "SKY", kicker: "Fare drop" },
-    { icon: Hotel, label: "Hotel", title: "Stay more, save more", detail: "Stack hotel savings with your next onward journey.", code: "STAY", kicker: "Bundle perk" }
+    { icon: Bus, label: "Bus", title: "Premium bus journeys", detail: "Reserved seats, cleaner coaches and early boarding support.", code: "FIRST", kicker: "Up to 15% off" },
+    { icon: CalendarDays, label: "Calendar", title: "Flexible date support", detail: "Switch eligible dates and keep the same journey context.", code: "FLEXI", kicker: "Free change" },
+    { icon: Moon, label: "Clock", title: "Smart weekday fares", detail: "Low-demand travel windows surfaced for better ticket value.", code: "SKY", kicker: "Fare drop" }
   ];
   return (
     <section className="clean-section offers-section">
