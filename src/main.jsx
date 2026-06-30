@@ -697,7 +697,9 @@ function extractSeatList(seatLayout) {
 function seatVisualType(seat, rawType) {
   const type = String(rawType || seat.rawType || seat.SeatType || seat.Type || seat.BerthType || "").toLowerCase();
   const htmlClass = String(seat.htmlClass || seat.className || "").toLowerCase();
+  const seatName = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.label || seat.id || "");
   if (seat.visualType) return seat.visualType;
+  if (/^[LU]\d+$/i.test(seatName)) return "berth";
   if (type.includes("sleeper") || type.includes("berth") || htmlClass.includes("sleeper") || htmlClass.includes("berth")) return "berth";
   if (/\bb?hseat\b/.test(htmlClass) || type.includes("horizontal") || type === "2") return "horizontal-seat";
   return "seat";
@@ -713,6 +715,9 @@ function normalizeApiSeat(seat, index) {
   const id = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.id || seat.SeatIndex || index + 1);
   const rawType = String(seat.SeatType || seat.Type || seat.BerthType || seat.rawType || "").toLowerCase();
   const visualType = seatVisualType(seat, rawType);
+  const isBerth = Boolean(seat.isBerth || visualType === "berth");
+  const finalWidth = isBerth && width > height ? Math.max(1, height) : width;
+  const finalHeight = isBerth && width > height ? Math.max(2, width) : (isBerth ? Math.max(2, height) : height);
   return {
     ...seat,
     id,
@@ -720,9 +725,9 @@ function normalizeApiSeat(seat, index) {
     deck: isUpper ? "upper" : "lower",
     row,
     column,
-    width,
-    height,
-    isBerth: Boolean(seat.isBerth || visualType === "berth"),
+    width: finalWidth,
+    height: finalHeight,
+    isBerth,
     visualType,
     isWalkway: Boolean(seat.isWalkway || seat.IsWalkway)
   };
@@ -1414,7 +1419,10 @@ function SeatMap({ route, selected, setSelected }) {
 function PassengerForm({ query, selectedSeats, passengers, setPassengers, contact, setContact, mode = "bus" }) {
   useEffect(() => {
     const count = Math.max(query.travellers || 1, mode === "bus" ? selectedSeats.length || 1 : 1);
-    setPassengers((current) => Array.from({ length: count }, (_, index) => current[index] || { ...initialPassenger, seat: selectedSeats[index] || "" }));
+    setPassengers((current) => Array.from({ length: count }, (_, index) => ({
+      ...(current[index] || initialPassenger),
+      seat: mode === "bus" ? (selectedSeats[index] || "") : (current[index]?.seat || "")
+    })));
   }, [query.travellers, selectedSeats.join(","), mode]);
 
   return (
@@ -1825,6 +1833,20 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
   const isBus = draftType === "bus";
   const isHotel = draftType === "hotel";
   const routeLine = isHotel ? `${draft.route.name || draft.route.providerName} · ${draft.route.city || draft.route.origin}` : `${draft.route.origin} to ${draft.route.destination} · ${draft.query.date}`;
+  const updateDraftPassengers = (nextPassengers) => {
+    setPendingCheckout((current) => {
+      const base = current || draft;
+      const passengers = typeof nextPassengers === "function" ? nextPassengers(base.passengers || []) : nextPassengers;
+      return { ...base, passengers };
+    });
+  };
+  const updateDraftContact = (nextContact) => {
+    setPendingCheckout((current) => {
+      const base = current || draft;
+      const contact = typeof nextContact === "function" ? nextContact(base.contact || {}) : nextContact;
+      return { ...base, contact };
+    });
+  };
   return (
     <section className="page-band checkout-page">
       <div className="page-heading"><CalendarDays size={34} /><div><h1>{confirmed ? "Booking successful" : isHotel ? "Review your stay" : "Review your ticket"}</h1><p>{confirmed ? "Your printable Orbita Travels booking is ready." : "Confirm traveller details before purchasing."}</p></div></div>
@@ -1839,8 +1861,22 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
         ) : (
           <div className="ticket-grid"><span>From<b>{draft.route.origin}</b></span><span>To<b>{draft.route.destination}</b></span><span>Class<b>{draft.route.classType || "Economy"}</b></span><span>Amount<b>₹{Number(draft.totalAmount).toLocaleString("en-IN")}</b></span></div>
         )}
-        <h3>{isHotel ? "Guest details" : "Passengers"}</h3>
-        {(draft.passengers || []).map((passenger, index) => <div className="ticket-passenger" key={index}><span>{passenger.name || `${isHotel ? "Guest" : "Passenger"} ${index + 1}`}</span><span>{passenger.age || "-"} yrs</span><span>{passenger.gender}</span><b>{isBus ? draft.selectedSeats[index] : draft.route.classType || draft.query.rooms || "-"}</b></div>)}
+        {confirmed ? (
+          <>
+            <h3>{isHotel ? "Guest details" : "Passengers"}</h3>
+            {(draft.passengers || []).map((passenger, index) => <div className="ticket-passenger" key={index}><span>{passenger.name || `${isHotel ? "Guest" : "Passenger"} ${index + 1}`}</span><span>{passenger.age || "-"} yrs</span><span>{passenger.gender}</span><b>{isBus ? draft.selectedSeats[index] : draft.route.classType || draft.query.rooms || "-"}</b></div>)}
+          </>
+        ) : (
+          <PassengerForm
+            query={draft.query}
+            selectedSeats={draft.selectedSeats || []}
+            passengers={draft.passengers || []}
+            setPassengers={updateDraftPassengers}
+            contact={draft.contact || {}}
+            setContact={updateDraftContact}
+            mode={draftType}
+          />
+        )}
         <p className="identity-note">{isBus ? "The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding." : "Please carry a valid government-issued ID matching the traveller or guest details."}</p>
         {!confirmed ? <button className="primary" onClick={purchase} disabled={purchasing}>{purchasing ? "Processing payment..." : isHotel ? "Pay and book room" : "Pay and purchase ticket"}</button> : <><button className="primary" onClick={() => window.print()}>Print booking</button><button className="secondary-action" onClick={() => setPage("dashboard")}>Back to dashboard</button></>}
         {message && <div className="success-note">{confirmed ? <span>Booking confirmed with PNR <strong>{confirmed.bookingCode}</strong>. {message}</span> : <span>{message}</span>}</div>}
