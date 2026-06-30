@@ -701,18 +701,23 @@ function buildDeckLayout(seats) {
     height: seat.width || 1
   } : seat);
 
-  const rowTracks = [...new Set(orientedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
-  const columnTracks = [...new Set(orientedSeats.map((seat) => seat.column))].sort((a, b) => a - b);
-  const rowMap = new Map(rowTracks.map((row, index) => [row, index + 1]));
-  const columnMap = new Map(columnTracks.map((column, index) => [column, index + 1]));
+  const minRow = Math.min(...orientedSeats.map((seat) => seat.row));
+  const minColumn = Math.min(...orientedSeats.map((seat) => seat.column));
   const normalizedSeats = orientedSeats.map((seat) => ({
     ...seat,
-    row: rowMap.get(seat.row) || 1,
-    column: columnMap.get(seat.column) || 1
+    row: Math.max(1, Math.round(seat.row - minRow + 1)),
+    column: Math.max(1, Math.round(seat.column - minColumn + 1)),
+    width: Math.max(1, Math.round(seat.width || 1)),
+    height: Math.max(1, Math.round(seat.height || 1))
   }));
-  const rows = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
+  const rowCount = Math.max(...normalizedSeats.map((seat) => seat.row + (seat.height || 1) - 1));
   const columns = Math.max(...normalizedSeats.map((seat) => seat.column + (seat.width || 1) - 1));
-  return { seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column), rows, columns, rotated: shouldRotateLandscape };
+  return {
+    seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column),
+    rows: rowCount,
+    columns,
+    rotated: shouldRotateLandscape
+  };
 }
 
 function PortraitSeatChart({ route, selected, setSelected }) {
@@ -813,7 +818,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
       <div className="deck-seat-scroll" aria-label={`${title} seat layout`}>
         <div className="portrait-seat-grid live-seat-grid" style={{
           gridTemplateColumns: `repeat(${layout.columns || 4}, 46px)`,
-          gridAutoRows: "46px",
+          gridTemplateRows: `repeat(${layout.rows || 1}, 46px)`,
           gap: "8px",
           justifyContent: "center",
         }}>
@@ -1595,6 +1600,16 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
   );
 }
 
+const loadRazorpayCheckout = () => new Promise((resolve, reject) => {
+  if (window.Razorpay) return resolve(true);
+  const script = document.createElement("script");
+  script.src = "https://checkout.razorpay.com/v1/checkout.js";
+  script.async = true;
+  script.onload = () => resolve(true);
+  script.onerror = () => reject(new Error("Razorpay checkout could not be loaded"));
+  document.body.appendChild(script);
+});
+
 function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refreshBookings }) {
   const [confirmed, setConfirmed] = useState(null);
   const [message, setMessage] = useState("");
@@ -1614,6 +1629,41 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
     setPurchasing(true);
     setMessage("");
     try {
+      const routeLineText = draft.route.name || (draftType === "hotel" ? `${draft.route.city || draft.route.origin}` : `${draft.route.origin} to ${draft.route.destination}`);
+      const order = await api("/bookings/payments/order", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: draft.totalAmount,
+          type: draftType,
+          routeLine: routeLineText
+        })
+      });
+      await loadRazorpayCheckout();
+      const payment = await new Promise((resolve, reject) => {
+        const checkout = new window.Razorpay({
+          key: order.keyId,
+          amount: order.amount,
+          currency: order.currency || "INR",
+          name: "Orbita Travels",
+          description: routeLineText,
+          order_id: order.id,
+          prefill: {
+            name: user.name,
+            email: user.email,
+            contact: draft.contact?.phone || user.phone || ""
+          },
+          notes: {
+            type: draftType,
+            route: routeLineText
+          },
+          theme: { color: "#0f62b7" },
+          handler: (response) => resolve(response),
+          modal: {
+            ondismiss: () => reject(new Error("Payment was not completed"))
+          }
+        });
+        checkout.open();
+      });
       const booking = await api("/bookings", {
         method: "POST",
         body: JSON.stringify({
@@ -1624,6 +1674,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
           passengers: (draft.passengers || []).map((passenger, index) => ({ ...passenger, seat: draft.selectedSeats?.[index] || "" })),
           contact: draft.contact,
           totalAmount: draft.totalAmount,
+          payment,
           metadata: {
             origin: draft.route.origin,
             destination: draft.route.destination,
@@ -1641,9 +1692,9 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
       });
       setConfirmed(booking);
       await refreshBookings();
-      setMessage("Ticket sent to your email and mobile number.");
+      setMessage("Payment received. Ticket sent to your email and mobile number.");
     } catch (error) {
-      setMessage(error.message || "Booking failed. Please try again.");
+      setMessage(error.message || "Payment or booking failed. Please try again.");
     } finally {
       setPurchasing(false);
     }
@@ -1671,7 +1722,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
         <h3>{isHotel ? "Guest details" : "Passengers"}</h3>
         {(draft.passengers || []).map((passenger, index) => <div className="ticket-passenger" key={index}><span>{passenger.name || `${isHotel ? "Guest" : "Passenger"} ${index + 1}`}</span><span>{passenger.age || "-"} yrs</span><span>{passenger.gender}</span><b>{isBus ? draft.selectedSeats[index] : draft.route.classType || draft.query.rooms || "-"}</b></div>)}
         <p className="identity-note">{isBus ? "The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding." : "Please carry a valid government-issued ID matching the traveller or guest details."}</p>
-        {!confirmed ? <button className="primary" onClick={purchase} disabled={purchasing}>{purchasing ? "Processing..." : isHotel ? "Book room" : "Purchase ticket"}</button> : <><button className="primary" onClick={() => window.print()}>Print booking</button><button className="secondary-action" onClick={() => setPage("dashboard")}>Back to dashboard</button></>}
+        {!confirmed ? <button className="primary" onClick={purchase} disabled={purchasing}>{purchasing ? "Processing payment..." : isHotel ? "Pay and book room" : "Pay and purchase ticket"}</button> : <><button className="primary" onClick={() => window.print()}>Print booking</button><button className="secondary-action" onClick={() => setPage("dashboard")}>Back to dashboard</button></>}
         {message && <div className="success-note">{confirmed ? <span>Booking confirmed with PNR <strong>{confirmed.bookingCode}</strong>. {message}</span> : <span>{message}</span>}</div>}
       </article>
     </section>
@@ -1681,18 +1732,56 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
 function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
   if (!user) return <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={null} />;
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [profileForm, setProfileForm] = useState({ name: user.name || "", phone: user.phone || "" });
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "" });
+  const [accountMessage, setAccountMessage] = useState("");
+  useEffect(() => {
+    setProfileForm({ name: user.name || "", phone: user.phone || "" });
+  }, [user.id, user.name, user.phone]);
   const sorted = [...bookings].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const current = [sorted[0]].filter(Boolean);
   const previous = sorted.slice(1);
   const totalSpend = bookings.reduce((sum, booking) => sum + Number(booking.totalAmount || 0), 0);
+  const paidSpend = bookings.filter((booking) => booking.paymentStatus === "paid").reduce((sum, booking) => sum + Number(booking.totalAmount || 0), 0);
+  const refundedAmount = bookings.filter((booking) => booking.paymentStatus === "refunded").reduce((sum, booking) => sum + Number(booking.metadata?.cancellation?.refundAmount || booking.totalAmount || 0), 0);
   const upcoming = bookings.filter((booking) => !["completed", "cancelled"].includes(booking.status)).length;
   const earnedFromBookings = bookings.reduce((sum, booking) => sum + Math.max(25, Math.floor(Number(booking.totalAmount || 0) / 100)), 0);
   const rewardPoints = Math.max(Number(user.rewardPoints || 0), earnedFromBookings);
   const busTrips = bookings.filter((booking) => booking.type === "bus").length;
   const railAirTrips = bookings.filter((booking) => ["train", "flight"].includes(booking.type)).length;
   const cancelBooking = async (booking) => {
-    await api(`/bookings/${booking.id}/cancel`, { method: "PATCH", body: JSON.stringify({ reason: "Customer requested cancellation" }) });
-    refreshBookings();
+    if (!window.confirm("Request cancellation and refund as per policy?")) return;
+    setAccountMessage("");
+    try {
+      const updated = await api(`/bookings/${booking.id}/cancel`, { method: "PATCH", body: JSON.stringify({ reason: "Customer requested cancellation" }) });
+      setAccountMessage(updated.status === "cancelled" ? "Cancellation completed and refund processed as per policy." : "Cancellation request captured. Our team will review the provider/refund response.");
+      refreshBookings();
+    } catch (error) {
+      setAccountMessage(error.message);
+    }
+  };
+  const updateProfile = async (event) => {
+    event.preventDefault();
+    setAccountMessage("");
+    try {
+      const data = await api("/auth/me", { method: "PATCH", body: JSON.stringify(profileForm) });
+      setUser(data.user);
+      setAccountMessage(data.message);
+    } catch (error) {
+      setAccountMessage(error.message);
+    }
+  };
+  const changePassword = async (event) => {
+    event.preventDefault();
+    setAccountMessage("");
+    try {
+      const data = await api("/auth/change-password", { method: "POST", body: JSON.stringify(passwordForm) });
+      setUser(data.user);
+      setPasswordForm({ currentPassword: "", newPassword: "" });
+      setAccountMessage(data.message);
+    } catch (error) {
+      setAccountMessage(error.message);
+    }
   };
   return (
     <section className="page-band dashboard-page">
@@ -1701,13 +1790,31 @@ function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
         <article><CalendarDays /><span>Total bookings</span><strong>{bookings.length}</strong></article>
         <article><Gift /><span>Reward points</span><strong>{rewardPoints.toLocaleString("en-IN")}</strong></article>
         <article><Bus /><span>Bus journeys</span><strong>{busTrips}</strong></article>
-        <article><Sparkles /><span>Total travel value</span><strong>₹{totalSpend.toLocaleString("en-IN")}</strong></article>
+        <article><Sparkles /><span>Paid travel value</span><strong>₹{paidSpend.toLocaleString("en-IN")}</strong></article>
       </div>
+      {accountMessage && <div className="dashboard-note">{accountMessage}</div>}
       <div className="dashboard-grid">
+        <article className="dash-panel account-panel">
+          <h3>Profile details</h3>
+          <form className="account-form" onSubmit={updateProfile}>
+            <label>Full name<input value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} /></label>
+            <label>Email<input value={user.email} disabled /></label>
+            <label>Mobile number<input value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} /></label>
+            <button type="submit">Save profile</button>
+          </form>
+        </article>
+        <article className="dash-panel account-panel">
+          <h3>Change password</h3>
+          <form className="account-form" onSubmit={changePassword}>
+            <label>Current password<input type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} placeholder={user.authProvider === "email" ? "Required" : "Optional for social login"} /></label>
+            <label>New password<input type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} /></label>
+            <button type="submit">Update password</button>
+          </form>
+        </article>
         <article className="dash-panel wide-panel"><h3>Current bookings</h3>{current.map((booking) => <BookingCard key={booking.id} booking={booking} onCancel={() => cancelBooking(booking)} onViewTicket={() => setSelectedTicket(booking)} />)}{!current.length && <p>No current bookings yet.</p>}</article>
         <article className="dash-panel"><h3>Previous bookings</h3>{previous.map((booking) => <BookingCard key={booking.id} booking={booking} compact onViewTicket={() => setSelectedTicket(booking)} />)}{!previous.length && <p>No previous bookings yet.</p>}</article>
         <article className="dash-panel"><h3>Quick actions</h3><button onClick={() => setPage("bus")}>Book bus</button><button onClick={() => setPage("flight")}>Book flight</button><button onClick={() => setPage("train")}>Book train</button><button onClick={() => setPage("support")}>Raise support request</button></article>
-        <article className="dash-panel reward-panel wide-panel"><h3>Orbita Rewards</h3><strong>{rewardPoints.toLocaleString("en-IN")} points</strong><p>Earn points on every confirmed booking and redeem them for journey benefits when offers are enabled.</p><div><span>Upcoming trips</span><b>{upcoming}</b></div><div><span>Rail and air trips</span><b>{railAirTrips}</b></div></article>
+        <article className="dash-panel reward-panel wide-panel"><h3>Orbita Rewards and wallet</h3><strong>{rewardPoints.toLocaleString("en-IN")} points</strong><p>Earn points on every confirmed booking. Refunds are pushed to the original Razorpay payment method after cancellation approval.</p><div><span>Upcoming trips</span><b>{upcoming}</b></div><div><span>Rail and air trips</span><b>{railAirTrips}</b></div><div><span>Total booked value</span><b>₹{totalSpend.toLocaleString("en-IN")}</b></div><div><span>Refunded value</span><b>₹{refundedAmount.toLocaleString("en-IN")}</b></div></article>
       </div>
       {selectedTicket && <TicketWindow booking={selectedTicket} onClose={() => setSelectedTicket(null)} />}
     </section>
@@ -1716,7 +1823,9 @@ function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
 
 function BookingCard({ booking, onCancel, compact, onViewTicket }) {
   const title = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "Orbita Travels booking";
-  return <div className="booking-card"><div><b>{booking.bookingCode}</b><span>{booking.type} · {title}</span></div><div><small>{booking.travelDate}</small><strong>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</strong></div><div className="tracking-line">Live updates · {booking.status}</div><div className="booking-actions"><button onClick={onViewTicket}>View ticket</button>{!compact && <><button>Modify</button><button onClick={onCancel}>Request cancellation</button><button>Re-book</button></>}</div></div>;
+  const refund = booking.metadata?.cancellation?.refundAmount;
+  const canCancel = !compact && !["cancel_requested", "cancelled", "completed"].includes(booking.status);
+  return <div className="booking-card"><div><b>{booking.bookingCode}</b><span>{booking.type} · {title}</span></div><div><small>{booking.travelDate}</small><strong>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</strong></div><div className="booking-finance-row"><span>Booking status <b>{booking.status}</b></span><span>Payment <b>{booking.paymentStatus}</b></span>{refund !== undefined && <span>Refund <b>₹{Number(refund).toLocaleString("en-IN")}</b></span>}</div><div className="tracking-line">Provider updates · {booking.metadata?.cancellation?.status || booking.metadata?.bdsdBookingError || "synced"}</div><div className="booking-actions"><button onClick={onViewTicket}>View ticket</button>{!compact && <><button>Modify</button>{canCancel && <button onClick={onCancel}>Cancel and refund</button>}<button>Re-book</button></>}</div></div>;
 }
 
 function TicketWindow({ booking, onClose }) {
@@ -1741,10 +1850,22 @@ function TicketWindow({ booking, onClose }) {
             <p>{from} to {to} · {booking.travelDate}</p>
             <div className="ticket-grid">
               <span>Status<b>{booking.status}</b></span>
-              <span>Type<b>{booking.type}</b></span>
+              <span>Payment<b>{booking.paymentStatus}</b></span>
               <span>Seats<b>{seats.length ? seats.join(", ") : "-"}</b></span>
               <span>Amount<b>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</b></span>
             </div>
+            {booking.metadata?.payment && <div className="ticket-grid">
+              <span>Payment provider<b>{booking.metadata.payment.provider || "razorpay"}</b></span>
+              <span>Order ID<b>{booking.metadata.payment.orderId || "-"}</b></span>
+              <span>Payment ID<b>{booking.metadata.payment.paymentId || "-"}</b></span>
+              <span>Verified<b>{booking.metadata.payment.verified ? "Yes" : "Pending"}</b></span>
+            </div>}
+            {booking.metadata?.cancellation && <div className="ticket-grid">
+              <span>Cancellation<b>{booking.metadata.cancellation.status}</b></span>
+              <span>Refund policy<b>{booking.metadata.cancellation.refundPercent}%</b></span>
+              <span>Refund amount<b>₹{Number(booking.metadata.cancellation.refundAmount || 0).toLocaleString("en-IN")}</b></span>
+              <span>Refund ID<b>{booking.metadata.cancellation.refund?.id || booking.metadata.cancellation.refund?.error || "-"}</b></span>
+            </div>}
             <h3>Passengers</h3>
             {(booking.passengers || []).map((passenger, index) => (
               <div className="ticket-passenger" key={index}>

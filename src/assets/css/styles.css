@@ -862,6 +862,12 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .customer-metrics svg { color: var(--blue); }
 .customer-metrics span { color: var(--muted); font-size: 13px; font-weight: 700; }
 .customer-metrics strong { font-size: 24px; color: var(--ink); }
+.dashboard-note { width: min(1180px, 100%); margin: -8px auto 18px; padding: 12px 14px; border: 1px solid #bfe7d5; border-radius: 12px; background: #e8fff5; color: #08764f; font-weight: 750; }
+.account-panel { align-content: start; }
+.account-form { display: grid; gap: 12px; }
+.account-form label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 800; }
+.account-form input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; background: white; color: var(--ink); font-size: 14px; }
+.account-form input:disabled { background: #f4f7fb; color: #7b8494; }
 .reward-panel { background: #fff7e5; border: 1px solid #e8ecef; }
 .reward-panel > strong { font-size: 30px; color: var(--red); }
 .reward-panel div { display: flex; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid rgba(10, 36, 80, .12); }
@@ -869,6 +875,9 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .booking-card { border: 1px solid #e8ecef; border-radius: 12px; padding: 14px; display: grid; gap: 10px; background: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); }
 .booking-card div { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .booking-card span, .booking-card small { color: var(--muted); }
+.booking-finance-row { justify-content: flex-start !important; }
+.booking-finance-row span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; background: #f8fbff; font-size: 12px; font-weight: 800; }
+.booking-finance-row b { color: var(--ink); }
 .tracking-line { color: var(--blue-dark); font-weight: 650; }
 .booking-actions { justify-content: flex-start !important; }
 .booking-actions button, .dash-panel button { border: 0; border-radius: 10px; padding: 9px 12px; background: #eef4ff; color: var(--blue-dark); font-weight: 650; border: 1px solid #e8ecef; transition: all .2s ease; }
