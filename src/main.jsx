@@ -831,18 +831,33 @@ function buildDeckLayout(seats) {
     width: Math.max(1, Math.round(seat.width || 1)),
     height: Math.max(1, Math.round(seat.height || 1))
   }));
-  const aisleAfter = aisleAfterColumn(shiftedSeats);
+  const intervals = seatIntervals(shiftedSeats);
+  const allBerths = shiftedSeats.every((seat) => seat.isBerth);
+  const largestGap = intervals.reduce((best, interval, index) => {
+    const next = intervals[index + 1];
+    if (!next) return best;
+    const gap = next.start - interval.end - 1;
+    return gap > best.gap ? { gap, index } : best;
+  }, { gap: 0, index: -1 });
+  const aisleAfterIndex = !allBerths && intervals.length >= 2
+    ? (largestGap.index >= 0 ? largestGap.index : Math.max(0, Math.floor(intervals.length / 2) - 1))
+    : -1;
+  const columnStartToLane = new Map(intervals.map((interval, index) => [
+    interval.start,
+    index + 1 + (aisleAfterIndex >= 0 && index > aisleAfterIndex ? 1 : 0)
+  ]));
+  const aisleColumn = aisleAfterIndex >= 0 ? aisleAfterIndex + 2 : null;
   const normalizedSeats = shiftedSeats.map((seat) => ({
     ...seat,
-    column: aisleAfter !== null && seat.column > aisleAfter ? seat.column + 1 : seat.column
+    column: columnStartToLane.get(seat.column) || seat.column
   }));
   const collisionSafeSeats = resolveSeatCollisions(normalizedSeats);
   const rowCount = Math.max(...collisionSafeSeats.map((seat) => seat.row + (seat.height || 1) - 1));
   const columns = Math.max(...collisionSafeSeats.map((seat) => seat.column + (seat.width || 1) - 1));
   const hasBerths = collisionSafeSeats.some((seat) => seat.isBerth);
-  const seatTrack = hasBerths ? "54px" : "42px";
+  const seatTrack = hasBerths ? "58px" : "42px";
   const rowTrack = hasBerths ? "52px" : "44px";
-  const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === (aisleAfter || 0) + 1 ? "38px" : seatTrack)).join(" ");
+  const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === aisleColumn ? "44px" : seatTrack)).join(" ");
   return {
     seats: collisionSafeSeats.sort((a, b) => a.row - b.row || a.column - b.column),
     rows: rowCount,

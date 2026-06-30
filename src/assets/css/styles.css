@@ -715,10 +715,10 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .booking-route-title span { color: #9aa3b4; }
 .window-offer { border-radius: 8px; padding: 10px 14px; background: #ffdb82; color: #111827; font-weight: 850; text-align: center; }
 .booking-tabs { position: sticky; top: 82px; z-index: 13; margin: 0; }
-.dedicated-seat-screen { width: calc(100% - 32px); max-width: 1320px; margin: 24px auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 0.34fr); gap: 22px; align-items: start; min-width: 0; }
-.portrait-chart-wrap { display: grid; grid-template-columns: repeat(2, minmax(300px, 1fr)); gap: 18px; align-items: start; min-width: 0; }
+.dedicated-seat-screen { width: calc(100% - 32px); max-width: 1220px; margin: 24px auto; display: grid; grid-template-columns: minmax(0, 900px) 330px; justify-content: center; gap: 22px; align-items: start; min-width: 0; }
+.portrait-chart-wrap { display: grid; grid-template-columns: repeat(2, minmax(280px, 430px)); justify-content: center; gap: 18px; align-items: start; min-width: 0; }
 .deck-lane { min-width: 0; width: 100%; }
-.deck-card { background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 22px 18px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; overflow: hidden; }
+.deck-card { width: 100%; background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 20px 16px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; overflow: hidden; }
 .deck-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .deck-head h3 { margin: 0; font-size: 15px; }
 .deck-head span { min-width: 58px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #6f7480; border: 1px solid #c5ccdc; font-size: 11px; font-weight: 850; margin-left: auto; }
@@ -726,10 +726,10 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .bus-front-marker i { display: block; width: 120px; height: 7px; border-radius: 999px; background: #cbe0ff; }
 .vehicle-icons { display: flex; justify-content: space-around; align-items: center; color: #777b88; margin-bottom: 22px; font-size: 12px; font-weight: 850; }
 .vehicle-icons span { min-width: 46px; height: 34px; display: grid; place-items: center; border: 1px solid #d8deea; border-radius: 8px; background: #fbfcff; }
-.deck-seat-scroll { width: 100%; overflow: auto hidden; padding: 4px 0 12px; scrollbar-gutter: stable; }
-.deck-seat-scroll::-webkit-scrollbar { height: 8px; }
+.deck-seat-scroll { width: 100%; max-height: min(430px, calc(100vh - 300px)); overflow: auto; padding: 4px 0 12px; scrollbar-gutter: stable both-edges; }
+.deck-seat-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .deck-seat-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-.portrait-seat-grid { display: grid; justify-content: center; gap: 12px 18px; max-height: none; overflow: visible; padding: 8px 8px 18px; grid-auto-rows: 58px; grid-auto-flow: dense; width: max-content; min-width: 100%; }
+.portrait-seat-grid { display: grid; justify-content: center; gap: 12px 18px; max-height: none; overflow: visible; padding: 8px 8px 18px; grid-auto-rows: 58px; grid-auto-flow: dense; width: max-content; min-width: max-content; margin: 0 auto; }
 .seater-grid { grid-template-columns: repeat(4, 36px); }
 .sleeper-grid, .mixed-grid { grid-template-columns: 46px 34px 46px 46px; align-items: start; }
 .live-seat-grid { max-width: 100%; margin: 0 auto; }
