@@ -92,6 +92,7 @@ function formatRating(rating, fallback = 4.3) {
 
 function CityDropdown({ value, placeholder, cities, onChange }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [menuStyle, setMenuStyle] = useState({});
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
@@ -125,7 +126,30 @@ function CityDropdown({ value, placeholder, cities, onChange }) {
     };
   }, [open]);
 
+  const normalizeSearch = (text) => String(text || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const searchTerm = normalizeSearch(query);
+  const scoredCities = cities
+    .map((city, index) => {
+      const name = String(city.name || "");
+      const normalizedName = normalizeSearch(name);
+      const words = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+      const initials = words.map((word) => word[0]).join("");
+      let score = index + 1000;
+      if (!searchTerm) score = index;
+      else if (normalizedName === searchTerm) score = -100;
+      else if (normalizedName.startsWith(searchTerm)) score = -90;
+      else if (words.some((word) => normalizeSearch(word).startsWith(searchTerm))) score = -80;
+      else if (initials.startsWith(searchTerm)) score = -70;
+      else if (normalizedName.includes(searchTerm)) score = -60;
+      else score = Infinity;
+      return { city, score };
+    })
+    .filter(({ score }) => Number.isFinite(score))
+    .sort((a, b) => a.score - b.score || String(a.city.name).localeCompare(String(b.city.name)));
+  const visibleCities = scoredCities.slice(0, 80).map(({ city }) => city);
+
   const selectCity = (cityName) => {
+    setQuery("");
     onChange(cityName);
     setOpen(false);
   };
@@ -137,7 +161,7 @@ function CityDropdown({ value, placeholder, cities, onChange }) {
       role="listbox"
       style={{ position: "fixed", zIndex: 1000, ...menuStyle }}
     >
-      {cities.length ? cities.map((city) => (
+      {visibleCities.length ? visibleCities.map((city) => (
         <li key={city.id || city.name}>
           <button
             type="button"
@@ -151,7 +175,7 @@ function CityDropdown({ value, placeholder, cities, onChange }) {
           </button>
         </li>
       )) : (
-        <li className="city-dropdown-empty">Loading cities…</li>
+        <li className="city-dropdown-empty">{cities.length ? "No cities found" : "Loading cities..."}</li>
       )}
     </ul>,
     document.body
@@ -160,23 +184,41 @@ function CityDropdown({ value, placeholder, cities, onChange }) {
   return (
     <>
       <div className={`city-dropdown ${open ? "open" : ""}`}>
-        <button
+        <div
           ref={triggerRef}
-          type="button"
           className="city-dropdown-trigger"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => {
-            setOpen((current) => {
-              if (!current) updatePosition();
-              return !current;
-            });
-          }}
+          onClick={() => setOpen(true)}
           aria-haspopup="listbox"
           aria-expanded={open}
         >
-          <span className={value ? "city-dropdown-value" : "city-dropdown-placeholder"}>{value || placeholder}</span>
+          <input
+            type="text"
+            className={value || query ? "city-dropdown-value" : "city-dropdown-placeholder"}
+            value={open ? query : value}
+            placeholder={open && value ? value : placeholder}
+            onFocus={() => {
+              setQuery("");
+              setOpen(true);
+              updatePosition();
+            }}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && visibleCities[0]) {
+                event.preventDefault();
+                selectCity(visibleCities[0].name);
+              }
+              if (event.key === "Escape") {
+                setOpen(false);
+                setQuery("");
+              }
+            }}
+            aria-label={placeholder}
+          />
           <ChevronDown size={18} className="city-dropdown-chevron" />
-        </button>
+        </div>
       </div>
       {menu}
     </>
@@ -715,6 +757,43 @@ function aisleAfterColumn(seats) {
   return null;
 }
 
+function makeSeatFootprint(seat) {
+  const width = Math.max(1, Math.round(seat.width || 1));
+  const height = Math.max(1, Math.round(seat.height || 1));
+  return { width, height };
+}
+
+function collides(seat, placed) {
+  const { width, height } = makeSeatFootprint(seat);
+  const left = seat.column;
+  const right = left + width - 1;
+  const top = seat.row;
+  const bottom = top + height - 1;
+  return placed.some((other) => {
+    const otherSize = makeSeatFootprint(other);
+    const otherLeft = other.column;
+    const otherRight = otherLeft + otherSize.width - 1;
+    const otherTop = other.row;
+    const otherBottom = otherTop + otherSize.height - 1;
+    return left <= otherRight && right >= otherLeft && top <= otherBottom && bottom >= otherTop;
+  });
+}
+
+function resolveSeatCollisions(seats) {
+  const placed = [];
+  const ordered = [...seats].sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id)));
+  for (const seat of ordered) {
+    const shiftedSeat = { ...seat };
+    let guard = 0;
+    while (collides(shiftedSeat, placed) && guard < 40) {
+      shiftedSeat.column += 1;
+      guard += 1;
+    }
+    placed.push(shiftedSeat);
+  }
+  return placed;
+}
+
 function buildDeckLayout(seats) {
   const measuredSeats = seats.map(normalizeApiSeat).filter(Boolean);
   if (!measuredSeats.length) return { seats: [], rows: [], columns: 0 };
@@ -744,14 +823,19 @@ function buildDeckLayout(seats) {
     ...seat,
     column: aisleAfter !== null && seat.column > aisleAfter ? seat.column + 1 : seat.column
   }));
-  const rowCount = Math.max(...normalizedSeats.map((seat) => seat.row + (seat.height || 1) - 1));
-  const columns = Math.max(...normalizedSeats.map((seat) => seat.column + (seat.width || 1) - 1));
-  const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === (aisleAfter || 0) + 1 ? "28px" : "46px")).join(" ");
+  const collisionSafeSeats = resolveSeatCollisions(normalizedSeats);
+  const rowCount = Math.max(...collisionSafeSeats.map((seat) => seat.row + (seat.height || 1) - 1));
+  const columns = Math.max(...collisionSafeSeats.map((seat) => seat.column + (seat.width || 1) - 1));
+  const hasBerths = collisionSafeSeats.some((seat) => seat.isBerth);
+  const seatTrack = hasBerths ? "54px" : "42px";
+  const rowTrack = hasBerths ? "52px" : "44px";
+  const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === (aisleAfter || 0) + 1 ? "38px" : seatTrack)).join(" ");
   return {
-    seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column),
+    seats: collisionSafeSeats.sort((a, b) => a.row - b.row || a.column - b.column),
     rows: rowCount,
     columns,
     columnTracks,
+    rowTrack,
     rotated: shouldRotateLandscape
   };
 }
@@ -854,8 +938,8 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
       <div className="deck-seat-scroll" aria-label={`${title} seat layout`}>
         <div className="portrait-seat-grid live-seat-grid" style={{
           gridTemplateColumns: layout.columnTracks || `repeat(${layout.columns || 4}, 46px)`,
-          gridTemplateRows: `repeat(${layout.rows || 1}, 46px)`,
-          gap: "8px",
+          gridTemplateRows: `repeat(${layout.rows || 1}, ${layout.rowTrack || "46px"})`,
+          gap: "12px 14px",
           justifyContent: "center",
         }}>
           {layout.seats.map(renderSeat)}
