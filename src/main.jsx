@@ -662,8 +662,8 @@ function seatVisualType(seat, rawType) {
 }
 
 function normalizeApiSeat(seat, index) {
-  const column = numberFrom(seat.ColumnNo, seat.Column, seat.column, seat.X, seat.x, seat.ColumnIndex);
-  const row = numberFrom(seat.RowNo, seat.Row, seat.row, seat.Y, seat.y, seat.RowIndex);
+  const column = numberFrom(seat.ColumnNo, seat.ColumnNumber, seat.Column, seat.SeatColumn, seat.column, seat.X, seat.x, seat.ColumnIndex, seat.ColNo, seat.Col);
+  const row = numberFrom(seat.RowNo, seat.RowNumber, seat.Row, seat.SeatRow, seat.row, seat.Y, seat.y, seat.RowIndex, seat.RowId);
   if (!Number.isFinite(column) || !Number.isFinite(row)) return null;
   const width = Math.max(1, numberFrom(seat.Width, seat.SeatWidth, seat.width, seat.w) || 1);
   const height = Math.max(1, numberFrom(seat.Height, seat.SeatHeight, seat.height, seat.h) || 1);
@@ -686,6 +686,35 @@ function normalizeApiSeat(seat, index) {
   };
 }
 
+function seatIntervals(seats) {
+  const byColumn = new Map();
+  for (const seat of seats) {
+    const start = seat.column;
+    const end = seat.column + (seat.width || 1) - 1;
+    const current = byColumn.get(start) || { start, end, count: 0 };
+    current.end = Math.max(current.end, end);
+    current.count += 1;
+    byColumn.set(start, current);
+  }
+  return [...byColumn.values()].sort((a, b) => a.start - b.start);
+}
+
+function aisleAfterColumn(seats) {
+  const intervals = seatIntervals(seats);
+  if (intervals.length < 2) return null;
+  let largestGap = { size: 0, after: null };
+  for (let index = 0; index < intervals.length - 1; index += 1) {
+    const gap = intervals[index + 1].start - intervals[index].end - 1;
+    if (gap > largestGap.size) largestGap = { size: gap, after: intervals[index].end };
+  }
+  if (largestGap.size > 0) return largestGap.after;
+  if (intervals.length >= 3) {
+    const leftBlockSize = intervals.length === 3 ? 1 : Math.floor(intervals.length / 2);
+    return intervals[Math.max(0, leftBlockSize - 1)].end;
+  }
+  return null;
+}
+
 function buildDeckLayout(seats) {
   const measuredSeats = seats.map(normalizeApiSeat).filter(Boolean);
   if (!measuredSeats.length) return { seats: [], rows: [], columns: 0 };
@@ -703,19 +732,26 @@ function buildDeckLayout(seats) {
 
   const minRow = Math.min(...orientedSeats.map((seat) => seat.row));
   const minColumn = Math.min(...orientedSeats.map((seat) => seat.column));
-  const normalizedSeats = orientedSeats.map((seat) => ({
+  const shiftedSeats = orientedSeats.map((seat) => ({
     ...seat,
     row: Math.max(1, Math.round(seat.row - minRow + 1)),
     column: Math.max(1, Math.round(seat.column - minColumn + 1)),
     width: Math.max(1, Math.round(seat.width || 1)),
     height: Math.max(1, Math.round(seat.height || 1))
   }));
+  const aisleAfter = aisleAfterColumn(shiftedSeats);
+  const normalizedSeats = shiftedSeats.map((seat) => ({
+    ...seat,
+    column: aisleAfter !== null && seat.column > aisleAfter ? seat.column + 1 : seat.column
+  }));
   const rowCount = Math.max(...normalizedSeats.map((seat) => seat.row + (seat.height || 1) - 1));
   const columns = Math.max(...normalizedSeats.map((seat) => seat.column + (seat.width || 1) - 1));
+  const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === (aisleAfter || 0) + 1 ? "28px" : "46px")).join(" ");
   return {
     seats: normalizedSeats.sort((a, b) => a.row - b.row || a.column - b.column),
     rows: rowCount,
     columns,
+    columnTracks,
     rotated: shouldRotateLandscape
   };
 }
@@ -817,7 +853,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
       <div className="vehicle-icons"><span>WC</span><span>Door</span></div>
       <div className="deck-seat-scroll" aria-label={`${title} seat layout`}>
         <div className="portrait-seat-grid live-seat-grid" style={{
-          gridTemplateColumns: `repeat(${layout.columns || 4}, 46px)`,
+          gridTemplateColumns: layout.columnTracks || `repeat(${layout.columns || 4}, 46px)`,
           gridTemplateRows: `repeat(${layout.rows || 1}, 46px)`,
           gap: "8px",
           justifyContent: "center",
