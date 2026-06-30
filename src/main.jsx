@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { Armchair, ArrowDownUp, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronDown, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, Menu, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
+import { Armchair, ArrowDownUp, ArrowLeft, BedDouble, Bot, BriefcaseBusiness, Bus, CalendarDays, ChevronDown, ChevronRight, Gift, Headphones, Hotel, LogOut, MapPin, MapPinned, Menu, MessageSquare, Moon, Percent, Plane, Search, ShieldCheck, Snowflake, Sparkles, Star, Sun, Sunrise, Sunset, Tag, ThermometerSnowflake, Train, UserRound, X } from "lucide-react";
 import { API_URL, api, tokenStore } from "./services/api";
 import { Logo } from "./components/Logo";
 import apsrtcLogo from "./assets/images/apsrtc-logo.png";
@@ -640,6 +640,12 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   const total = Number(route.price) * Math.max(isBus ? seats.length : passengers.length, 1);
   const canContinue = step === "points" ? boardingPoint && dropPoint : step === "seats" ? selectedSeats.length > 0 : true;
 
+  const goBack = () => {
+    if (step === "passenger" && isBus) return setStep("seats");
+    if (step === "seats" && isBus) return setStep("points");
+    setPage(route.type || "bus");
+  };
+
   const goPassenger = () => {
     if (!user) {
       setAuthReturnPage("booking");
@@ -659,7 +665,9 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   return (
     <section className="booking-page">
       <div className="booking-window-head">
-        <button className="window-close" onClick={() => setPage(route.type || "bus")}>×</button>
+        <button className="window-close" onClick={goBack} aria-label={step === "points" ? "Close booking" : "Go back"}>
+          {step === "points" ? <X size={26} /> : <ArrowLeft size={24} />}
+        </button>
         <div className="booking-route-title"><b>{route.origin}</b><span>→</span><b>{route.destination}</b></div>
         <div className="window-offer">Last min. 10% OFF</div>
       </div>
@@ -924,8 +932,9 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
           gridColumnEnd: `span ${seat.width || 1}`,
           gridRowStart: seat.row,
           gridRowEnd: `span ${seat.height || 1}`,
-          alignSelf: "stretch",
-          justifySelf: "stretch"
+          alignSelf: isBerth ? "start" : "stretch",
+          justifySelf: isBerth ? "center" : "stretch",
+          ...(isBerth ? { width: 46, height: Math.max(104, Math.min(132, ((seat.height || 2) * 52) + (((seat.height || 2) - 1) * 12))) } : {})
         }}
       >
         <b>{seat.SeatName || seat.label || seat.id}</b>
@@ -1123,7 +1132,7 @@ function FareSummary({ total, route, boardingPoint, dropPoint, seats }) {
 
 function JourneyResults({ type, results, query, onViewSeats }) {
   const [filters, setFilters] = useState([]);
-  const [activeOperator, setActiveOperator] = useState("private");
+  const [activeOperator, setActiveOperator] = useState("all");
   const [departureSlot, setDepartureSlot] = useState("any");
   const [sortBy, setSortBy] = useState("price");
   const [popularTab, setPopularTab] = useState("boarding");
@@ -1138,7 +1147,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
   useEffect(() => {
     setMinPrice(routeMinPrice);
     setMaxPrice(routeMaxPrice);
-    setActiveOperator("private");
+    setActiveOperator("all");
     setDepartureSlot("any");
     setSortBy("price");
     setSelectedPoint("");
@@ -1180,7 +1189,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
   const operators = [...new Set(results.map((route) => route.providerName))].slice(0, 8);
 
   const operatorFiltered = type === "bus" && stateTabs.length
-    ? results.filter((route) => activeOperator === "private" ? !operatorBrand(route) : operatorBrand(route)?.key === activeOperator)
+    ? results.filter((route) => activeOperator === "all" ? true : activeOperator === "private" ? !operatorBrand(route) : operatorBrand(route)?.key === activeOperator)
     : results;
 
   const filtered = operatorFiltered
@@ -1199,7 +1208,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
     });
 
   const toggleFilter = (key) => setFilters((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
-  const clearFilters = () => { setFilters([]); setDepartureSlot("any"); setMinPrice(routeMinPrice); setMaxPrice(routeMaxPrice); setBusPartner(""); setSelectedPoint(""); };
+  const clearFilters = () => { setFilters([]); setDepartureSlot("any"); setMinPrice(routeMinPrice); setMaxPrice(routeMaxPrice); setBusPartner(""); setSelectedPoint(""); setActiveOperator("all"); };
 
   const sortOptions = [
     ["price", "Price"],
@@ -1329,6 +1338,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
 
         {type === "bus" && stateTabs.length > 0 && (
           <div className="operator-tabs">
+            <button className={activeOperator === "all" ? "active" : ""} onClick={() => setActiveOperator("all")}>All buses</button>
             <button className={activeOperator === "private" ? "active" : ""} onClick={() => setActiveOperator("private")}>Private buses</button>
             {stateTabs.map((brand) => <button key={brand.key} className={activeOperator === brand.key ? "active" : ""} onClick={() => setActiveOperator(brand.key)}><img src={brand.logo} alt={`${brand.title} logo`} /> {brand.title}</button>)}
           </div>
@@ -1849,6 +1859,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
   };
   return (
     <section className="page-band checkout-page">
+      {!confirmed && isBus && <button type="button" className="checkout-back" onClick={() => setPage("booking")}><ArrowLeft size={18} /> Back to seats</button>}
       <div className="page-heading"><CalendarDays size={34} /><div><h1>{confirmed ? "Booking successful" : isHotel ? "Review your stay" : "Review your ticket"}</h1><p>{confirmed ? "Your printable Orbita Travels booking is ready." : "Confirm traveller details before purchasing."}</p></div></div>
       <article className="print-ticket">
         <div className="ticket-head"><Logo /><strong>{confirmed?.bookingCode || "PNR will be generated after purchase"}</strong></div>
