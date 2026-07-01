@@ -90,6 +90,12 @@ function formatRating(rating, fallback = 4.3) {
   return Number.isFinite(value) ? value.toFixed(1) : String(fallback);
 }
 
+function sentenceCaseCity(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (match) => match.toUpperCase());
+}
+
 function CityDropdown({ value, placeholder, cities, onChange }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -171,7 +177,7 @@ function CityDropdown({ value, placeholder, cities, onChange }) {
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => selectCity(city.name)}
           >
-            {city.name}
+            {sentenceCaseCity(city.name)}
           </button>
         </li>
       )) : (
@@ -194,8 +200,8 @@ function CityDropdown({ value, placeholder, cities, onChange }) {
           <input
             type="text"
             className={value || query ? "city-dropdown-value" : "city-dropdown-placeholder"}
-            value={open ? query : value}
-            placeholder={open && value ? value : placeholder}
+            value={open ? query : sentenceCaseCity(value)}
+            placeholder={open && value ? sentenceCaseCity(value) : placeholder}
             onFocus={() => {
               setQuery("");
               setOpen(true);
@@ -261,6 +267,7 @@ function App() {
   const [pendingRoute, setPendingRoute] = useState(null);
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [activeJourney, setActiveJourney] = useState(null);
+  const [bookingResumeState, setBookingResumeState] = useState(null);
   const [authReturnPage, setAuthReturnPage] = useState(null);
   const [authMessage, setAuthMessage] = useState("");
 
@@ -284,7 +291,7 @@ function App() {
         const data = await api("/auth/me");
         setUser(data.user);
         window.history.replaceState({}, "", "/");
-        setPage("dashboard");
+        setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
         return;
       }
       if (error) throw new Error(error);
@@ -306,14 +313,14 @@ function App() {
       tokenStore.set(data.token);
       setUser(data.user);
       window.history.replaceState({}, "", "/");
-      setPage("dashboard");
+      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
     };
     finishGoogleLogin().catch((error) => {
       setAuthMessage(error.message || "Google sign-in failed. Please try again.");
       window.history.replaceState({}, "", "/");
       setPage("auth");
     });
-  }, []);
+  }, [authReturnPage, pendingCheckout]);
 
   useEffect(() => { refreshBookings(); }, [user]);
   const immersiveBooking = page === "booking";
@@ -329,7 +336,7 @@ function App() {
       {page === "dashboard" && <DashboardPage user={user} setUser={setUser} setPage={setPage} bookings={bookings} refreshBookings={refreshBookings} />}
       {page === "support" && <SupportPage user={user} bookings={bookings} />}
       {page === "auth" && <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={pendingCheckout} authReturnPage={authReturnPage} setAuthReturnPage={setAuthReturnPage} authMessage={authMessage} />}
-      {page === "booking" && <BookingPage activeJourney={activeJourney} setPage={setPage} user={user} setPendingCheckout={setPendingCheckout} setAuthReturnPage={setAuthReturnPage} />}
+      {page === "booking" && <BookingPage activeJourney={activeJourney} setPage={setPage} user={user} setPendingCheckout={setPendingCheckout} setAuthReturnPage={setAuthReturnPage} bookingResumeState={bookingResumeState} setBookingResumeState={setBookingResumeState} />}
       {page === "checkout" && <CheckoutPage user={user} setPage={setPage} pendingCheckout={pendingCheckout} setPendingCheckout={setPendingCheckout} refreshBookings={refreshBookings} />}
       {!immersiveBooking && <FloatingAssistant user={user} bookings={bookings} />}
       {!immersiveBooking && <Footer setPage={setPage} />}
@@ -568,8 +575,8 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
       ) : (
         <>
           <div className="main-search-row">
-            <label><span>{type === "flight" ? <Plane /> : <Train />} From</span><select value={query.from} onChange={(e) => { const from = e.target.value; setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}><option value="">Select from city</option>{fromCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
-            <label><span><MapPin /> To</span><select value={query.to} onChange={(e) => { const to = e.target.value; setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}><option value="">Select destination</option>{toCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}</select></label>
+            <label><span>{type === "flight" ? <Plane /> : <Train />} From</span><select value={query.from} onChange={(e) => { const from = e.target.value; setResults([]); setQuery({ ...query, from, to: from === query.to ? "" : query.to }); }}><option value="">Select from city</option>{fromCities.map((city) => <option key={city.id} value={city.name}>{sentenceCaseCity(city.name)}</option>)}</select></label>
+            <label><span><MapPin /> To</span><select value={query.to} onChange={(e) => { const to = e.target.value; setResults([]); setQuery({ ...query, to, from: to === query.from ? "" : query.from }); }}><option value="">Select destination</option>{toCities.map((city) => <option key={city.id} value={city.name}>{sentenceCaseCity(city.name)}</option>)}</select></label>
             <label><span><CalendarDays /> Date of journey</span><input type="date" value={query.date} onChange={(e) => setQuery({ ...query, date: e.target.value })} /></label>
             {query.tripType === "round-trip" && <label><span><CalendarDays /> Return</span><input type="date" value={query.returnDate} onChange={(e) => setQuery({ ...query, returnDate: e.target.value })} /></label>}
             <label><span><UserRound /> Travellers</span><input type="number" min="1" max="6" value={query.travellers} onChange={(e) => setQuery({ ...query, travellers: Number(e.target.value) })} /></label>
@@ -590,15 +597,16 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   );
 }
 
-function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuthReturnPage }) {
-  const [step, setStep] = useState("points");
+function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuthReturnPage, bookingResumeState, setBookingResumeState }) {
+  const savedState = bookingResumeState?.routeId === activeJourney?.route?.id ? bookingResumeState : null;
+  const [step, setStep] = useState(savedState?.step || "points");
   const [liveRoute, setLiveRoute] = useState(null);
   const [livePoints, setLivePoints] = useState(null);
-  const [selectedSeats, setSelectedSeats] = useState([]);
-  const [passengers, setPassengers] = useState(user ? [{ name: user.name || "", age: "", gender: "Male", seat: "" }] : [{ ...initialPassenger }]);
-  const [contact, setContact] = useState(user ? { email: user.email || "", phone: user.phone || "", emergencyPhone: "" } : { email: "", phone: "", emergencyPhone: "" });
-  const [boardingPoint, setBoardingPoint] = useState("");
-  const [dropPoint, setDropPoint] = useState("");
+  const [selectedSeats, setSelectedSeats] = useState(savedState?.selectedSeats || []);
+  const [passengers, setPassengers] = useState(savedState?.passengers || (user ? [{ name: user.name || "", age: "", gender: "Male", seat: "" }] : [{ ...initialPassenger }]));
+  const [contact, setContact] = useState(savedState?.contact || (user ? { email: user.email || "", phone: user.phone || "", emergencyPhone: "" } : { email: "", phone: "", emergencyPhone: "" }));
+  const [boardingPoint, setBoardingPoint] = useState(savedState?.boardingPoint || "");
+  const [dropPoint, setDropPoint] = useState(savedState?.dropPoint || "");
 
   useEffect(() => {
     if (!user) return;
@@ -609,9 +617,15 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   useEffect(() => {
     const selectedRoute = activeJourney?.route;
     if (!selectedRoute?.id) return;
+    const nextSavedState = bookingResumeState?.routeId === selectedRoute.id ? bookingResumeState : null;
+    setStep(nextSavedState?.step || (selectedRoute.type === "bus" ? "points" : "passenger"));
+    setSelectedSeats(nextSavedState?.selectedSeats || []);
+    setPassengers(nextSavedState?.passengers || (user ? [{ name: user.name || "", age: "", gender: "Male", seat: "" }] : [{ ...initialPassenger }]));
+    setContact(nextSavedState?.contact || (user ? { email: user.email || "", phone: user.phone || "", emergencyPhone: "" } : { email: "", phone: "", emergencyPhone: "" }));
+    setBoardingPoint(nextSavedState?.boardingPoint || "");
+    setDropPoint(nextSavedState?.dropPoint || "");
     setLiveRoute({ ...selectedRoute, seatLayout: null, seatLayoutLoading: true, seatLayoutError: false });
     setLivePoints(null);
-    setSelectedSeats([]);
     if (selectedRoute.type !== "bus") {
       setStep("passenger");
       return;
@@ -623,6 +637,19 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
     });
     api(`/transport/${selectedRoute.type}/${selectedRoute.id}/points`).then(setLivePoints).catch(() => {});
   }, [activeJourney?.route?.id]);
+
+  useEffect(() => {
+    if (!activeJourney?.route?.id) return;
+    setBookingResumeState?.({
+      routeId: activeJourney.route.id,
+      step,
+      selectedSeats,
+      passengers,
+      contact,
+      boardingPoint,
+      dropPoint
+    });
+  }, [activeJourney?.route?.id, step, selectedSeats, passengers, contact, boardingPoint, dropPoint]);
 
   if (!activeJourney) {
     return <section className="page-band"><div className="page-heading"><Bus size={34} /><div><h1>No journey selected</h1><p>Please choose a service from the search results first.</p></div></div><button className="primary" onClick={() => setPage("bus")}>Search buses</button></section>;
@@ -648,6 +675,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
 
   const goPassenger = () => {
     if (!user) {
+      setBookingResumeState?.({ routeId: route.id, step: "seats", selectedSeats, passengers, contact, boardingPoint, dropPoint });
       setAuthReturnPage("booking");
       setPage("auth");
       return;
@@ -658,7 +686,9 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   const buy = () => {
     const selectedBoarding = boardingPointOptions.find((point) => point.name === boardingPoint);
     const selectedDrop = droppingPointOptions.find((point) => point.name === dropPoint);
+    setBookingResumeState?.({ routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint });
     setPendingCheckout({ route, query, selectedSeats: seats, passengers, contact, boardingPoint, dropPoint, boardingPointId: selectedBoarding?.id, dropPointId: selectedDrop?.id, totalAmount: total });
+    if (!user) setAuthReturnPage("checkout");
     setPage(user ? "checkout" : "auth");
   };
 
@@ -672,7 +702,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
         <div className="window-offer">Last min. 10% OFF</div>
       </div>
       <div className="wizard-tabs booking-tabs">
-        {(isBus ? ["points", "seats", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} onClick={() => item === "passenger" && !user ? (setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
+        {(isBus ? ["points", "seats", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} onClick={() => item === "passenger" && !user ? (setBookingResumeState?.({ routeId: route.id, step: "seats", selectedSeats, passengers, contact, boardingPoint, dropPoint }), setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
       </div>
       {isBus && step === "points" && <BoardDropStep boardingPoints={boardingPoints} droppingPoints={droppingPoints} boardingPoint={boardingPoint} setBoardingPoint={setBoardingPoint} dropPoint={dropPoint} setDropPoint={setDropPoint} />}
       {isBus && step === "seats" && <div className="dedicated-seat-screen"><PortraitSeatChart route={route} selected={selectedSeats} setSelected={setSelectedSeats} /><BusProfilePanel route={route} /></div>}
@@ -851,13 +881,25 @@ function buildDeckLayout(seats) {
     ...seat,
     column: columnStartToLane.get(seat.column) || seat.column
   }));
-  const collisionSafeSeats = resolveSeatCollisions(normalizedSeats);
+  const compressedRowStarts = [...new Set(normalizedSeats.map((seat) => seat.row))].sort((a, b) => a - b);
+  const rowStartToLane = new Map(compressedRowStarts.map((row, index) => [row, index + 1]));
+  const rowCompressedSeats = normalizedSeats.map((seat) => ({
+    ...seat,
+    row: rowStartToLane.get(seat.row) || seat.row
+  }));
+  const collisionSafeSeats = resolveSeatCollisions(rowCompressedSeats);
   const rowCount = Math.max(...collisionSafeSeats.map((seat) => seat.row + (seat.height || 1) - 1));
   const columns = Math.max(...collisionSafeSeats.map((seat) => seat.column + (seat.width || 1) - 1));
   const hasBerths = collisionSafeSeats.some((seat) => seat.isBerth);
-  const seatTrack = hasBerths ? "58px" : "46px";
-  const rowTrack = hasBerths ? "52px" : "46px";
-  const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === aisleColumn ? "44px" : seatTrack)).join(" ");
+  const gridGap = 8;
+  const targetWidth = hasBerths ? 560 : 520;
+  const targetHeight = hasBerths ? 108 : 86;
+  const compactSeatTrack = Math.max(hasBerths ? 16 : 18, Math.min(hasBerths ? 38 : 30, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
+  const compactRowTrack = Math.max(hasBerths ? 18 : 20, Math.min(hasBerths ? 32 : 28, Math.floor((targetHeight - Math.max(0, rowCount - 1) * gridGap) / Math.max(rowCount, 1))));
+  const aisleTrack = Math.max(20, Math.min(28, compactSeatTrack));
+  const seatTrack = `${compactSeatTrack}px`;
+  const rowTrack = `${compactRowTrack}px`;
+  const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === aisleColumn ? `${aisleTrack}px` : seatTrack)).join(" ");
   return {
     seats: collisionSafeSeats.sort((a, b) => a.row - b.row || a.column - b.column),
     rows: rowCount,
@@ -953,28 +995,25 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
         }}
       >
         <b>{seat.SeatName || seat.label || seat.id}</b>
-        {isBerth ? <span className="pillow" /> : <Armchair size={17} />}
+        {isBerth ? <span className="pillow" /> : <Armchair size={13} />}
         <small>{sold ? "Sold" : `₹${fare}`}</small>
       </button>
     );
   };
 
   return (
-    <article className={`deck-card ${layout.rotated ? "rotated-layout" : ""}`}>
-      <div className="deck-head"><h3>{title}</h3><span>Driver</span></div>
-      <div className="bus-front-marker"><i /> <b>FRONT OF VEHICLE</b></div>
-      <div className="vehicle-icons"><span>WC</span><span>Door</span></div>
+    <article className={`deck-card compact-deck-card ${layout.rotated ? "rotated-layout" : ""}`}>
+      <div className="compact-deck-title"><h3>{title}</h3><span>Driver</span></div>
       <div className="deck-seat-scroll" aria-label={`${title} seat layout`}>
         <div className="portrait-seat-grid live-seat-grid" style={{
           gridTemplateColumns: layout.columnTracks || `repeat(${layout.columns || 4}, 46px)`,
           gridTemplateRows: `repeat(${layout.rows || 1}, ${layout.rowTrack || "46px"})`,
-          gap: "12px 14px",
+          gap: "8px 10px",
           justifyContent: "start",
         }}>
           {layout.seats.map(renderSeat)}
         </div>
       </div>
-      <div className="rear-marker">REAR</div>
     </article>
   );
 }
@@ -1640,6 +1679,11 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
   const [form, setForm] = useState({ name: "", email: "customer@orbitatravels.com", phone: "", password: "customer123" });
   const [resetForm, setResetForm] = useState({ email: "", token: resetTokenFromUrl, password: "" });
   const [message, setMessage] = useState(authMessage || "");
+  const returnToFlow = () => {
+    if (authReturnPage === "booking" || pendingCheckout?.route?.type === "bus") return setPage("booking");
+    if (authReturnPage === "checkout" && pendingCheckout) return setPage("checkout");
+    setPage("bus");
+  };
 
   useEffect(() => {
     if (authMessage) setMessage(authMessage);
@@ -1715,6 +1759,7 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
 
   return (
     <section className="page-band account-page">
+      {(authReturnPage || pendingCheckout) && <button type="button" className="checkout-back" onClick={returnToFlow}><ArrowLeft size={18} /> Back to booking</button>}
       <div className="page-heading"><UserRound size={34} /><div><h1>{mode === "forgot" ? "Reset your password" : mode === "reset" ? "Create a new password" : mode === "login" ? "Login to Orbita Travels" : "Create your Orbita Travels account"}</h1><p>{mode === "forgot" ? "Enter your registered email and we will prepare reset instructions." : mode === "reset" ? "Use the secure reset token from your email to set a new password." : "Email and mobile number are collected so ticket email and SMS gateways can be enabled later."}</p></div></div>
       {mode === "forgot" ? (
         <form className="auth-card" onSubmit={requestReset}>
