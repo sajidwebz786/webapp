@@ -724,8 +724,8 @@ function normalizeApiSeat(seat, index) {
   const rawType = String(seat.SeatType || seat.Type || seat.BerthType || seat.rawType || "").toLowerCase();
   const visualType = seatVisualType(seat, rawType);
   const isBerth = Boolean(seat.isBerth || visualType === "berth");
-  const finalWidth = isBerth && width > height ? Math.max(1, height) : width;
-  const finalHeight = isBerth && width > height ? Math.max(2, width) : (isBerth ? Math.max(2, height) : height);
+  const finalWidth = width;
+  const finalHeight = isBerth && width === 1 && height === 1 ? 2 : height;
   return {
     ...seat,
     id,
@@ -813,7 +813,7 @@ function buildDeckLayout(seats) {
 
   const rawRows = [...new Set(measuredSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   const rawColumns = [...new Set(measuredSeats.map((seat) => seat.column))].sort((a, b) => a - b);
-  const shouldRotateLandscape = rawColumns.length > rawRows.length + 2 && rawColumns.length > 5;
+  const shouldRotateLandscape = rawRows.length > rawColumns.length + 2 && rawRows.length > 5;
   const orientedSeats = measuredSeats.map((seat) => shouldRotateLandscape ? {
     ...seat,
     row: seat.column,
@@ -855,8 +855,8 @@ function buildDeckLayout(seats) {
   const rowCount = Math.max(...collisionSafeSeats.map((seat) => seat.row + (seat.height || 1) - 1));
   const columns = Math.max(...collisionSafeSeats.map((seat) => seat.column + (seat.width || 1) - 1));
   const hasBerths = collisionSafeSeats.some((seat) => seat.isBerth);
-  const seatTrack = hasBerths ? "58px" : "42px";
-  const rowTrack = hasBerths ? "52px" : "44px";
+  const seatTrack = hasBerths ? "58px" : "46px";
+  const rowTrack = hasBerths ? "52px" : "46px";
   const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === aisleColumn ? "44px" : seatTrack)).join(" ");
   return {
     seats: collisionSafeSeats.sort((a, b) => a.row - b.row || a.column - b.column),
@@ -934,12 +934,13 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
     const women = Boolean(seat.IsLadiesSeat || seat.ladies);
     const isBerth = Boolean(seat.isBerth);
     const isHorizontalSeat = !isBerth && seat.visualType === "horizontal-seat";
+    const isHorizontalBerth = isBerth && (seat.width || 1) > (seat.height || 1);
     const fare = Number(seat.SeatFare || seat.Price?.OfferedPrice || seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
     
     return (
       <button
         key={seat.id}
-        className={`${isBerth ? "sleeper-berth" : "chair-seat"} ${isHorizontalSeat ? "horizontal-seat" : ""} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
+        className={`${isBerth ? "sleeper-berth" : "chair-seat"} ${isHorizontalSeat ? "horizontal-seat" : ""} ${isHorizontalBerth ? "horizontal-berth" : ""} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
         onClick={() => toggle(seat.id)}
         aria-label={`${title} seat ${seat.id}`}
         style={{
@@ -947,9 +948,8 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
           gridColumnEnd: `span ${seat.width || 1}`,
           gridRowStart: seat.row,
           gridRowEnd: `span ${seat.height || 1}`,
-          alignSelf: isBerth ? "start" : "stretch",
-          justifySelf: isBerth ? "center" : "stretch",
-          ...(isBerth ? { width: 46, height: Math.max(104, Math.min(132, ((seat.height || 2) * 52) + (((seat.height || 2) - 1) * 12))) } : {})
+          alignSelf: "stretch",
+          justifySelf: "stretch"
         }}
       >
         <b>{seat.SeatName || seat.label || seat.id}</b>
@@ -969,7 +969,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
           gridTemplateColumns: layout.columnTracks || `repeat(${layout.columns || 4}, 46px)`,
           gridTemplateRows: `repeat(${layout.rows || 1}, ${layout.rowTrack || "46px"})`,
           gap: "12px 14px",
-          justifyContent: "center",
+          justifyContent: "start",
         }}>
           {layout.seats.map(renderSeat)}
         </div>

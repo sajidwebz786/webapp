@@ -729,10 +729,10 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
 .deck-seat-scroll { width: 100%; max-height: min(430px, calc(100vh - 300px)); overflow: auto; padding: 4px 0 12px; scrollbar-gutter: stable both-edges; }
 .deck-seat-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .deck-seat-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-.portrait-seat-grid { display: grid; justify-content: center; gap: 12px 18px; max-height: none; overflow: visible; padding: 8px 8px 18px; grid-auto-rows: 58px; grid-auto-flow: dense; width: max-content; min-width: max-content; margin: 0 auto; }
+.portrait-seat-grid { display: grid; justify-content: start; gap: 12px 18px; max-height: none; overflow: visible; padding: 8px 8px 18px; grid-auto-rows: 58px; grid-auto-flow: dense; width: max-content; min-width: max-content; margin: 0 auto; }
 .seater-grid { grid-template-columns: repeat(4, 36px); }
 .sleeper-grid, .mixed-grid { grid-template-columns: 46px 34px 46px 46px; align-items: start; }
-.live-seat-grid { max-width: 100%; margin: 0 auto; }
+.live-seat-grid { max-width: none; margin: 0 auto; }
 .live-seat-grid .chair-seat,
 .live-seat-grid .sleeper-berth {
   width: 100%;
@@ -744,6 +744,7 @@ h1 { font-family: var(--display-font); font-size: 54px; line-height: 1.02; font-
   min-width: 78px;
 }
 .live-seat-grid .sleeper-berth { min-width: 46px; min-height: 104px; }
+.live-seat-grid .sleeper-berth.horizontal-berth { min-width: 104px; min-height: 46px; }
 .walkway { width: 34px; height: 66px; background: transparent; border: 0; }
 .walkway::before,
 .walkway::after { content: ""; }
