@@ -854,6 +854,8 @@ function resolveSeatCollisions(seats) {
 
 function seatLabelParts(seat) {
   const label = String(seat.SeatName || seat.label || seat.id || "").trim().toUpperCase();
+  const numericOnly = label.match(/^(\d+)$/);
+  if (numericOnly) return { number: Number(numericOnly[1]), prefix: "", suffix: "N", label };
   const numberFirst = label.match(/^(\d+)([A-Z]+)$/);
   if (numberFirst) return { number: Number(numberFirst[1]), prefix: "", suffix: numberFirst[2], label };
   const letterFirst = label.match(/^([A-Z]+)(\d+)$/);
@@ -862,8 +864,8 @@ function seatLabelParts(seat) {
 }
 
 function suffixOrder(suffix, suffixes) {
-  const bdsdLowerOrder = ["B", "A", "L"];
-  const upperDeckOrder = ["UC", "UB", "UA", "U"];
+  const bdsdLowerOrder = ["B", "A", "N", "L"];
+  const upperDeckOrder = ["UC", "UB", "UA", "U", "SU"];
   const lowerDeckOrder = ["E", "G", "D", "F", "LA", "LB", "LC"];
   const mixedOrder = ["C", "B", "A", "E", "G", "D", "F", "LA", "LB", "LC", "U", "L"];
   const order = suffixes.some((item) => upperDeckOrder.includes(item))
@@ -878,10 +880,11 @@ function suffixOrder(suffix, suffixes) {
 }
 
 function suffixSlot(suffix, suffixes) {
-  if (suffixes.some((item) => ["B", "A", "L"].includes(item))) {
+  if (suffixes.some((item) => ["B", "A", "N", "L"].includes(item))) {
     const bdsdLowerSlots = {
       B: { row: 1, subColumn: 1 },
       A: { row: 2, subColumn: 1 },
+      N: { row: 1, subColumn: 1 },
       L: { row: 3, subColumn: 1, sleeper: true }
     };
     return bdsdLowerSlots[suffix] || null;
@@ -915,6 +918,36 @@ function buildLabelOrderedDeckLayout(seats) {
 
   const suffixList = [...new Set(parsed.map((item) => item.parts.suffix))];
   const hasOnlyUpperSeries = suffixList.length === 1 && suffixList[0] === "U";
+  const hasUpperBerthSeries = suffixList.some((suffix) => ["U", "SU", "UA", "UB", "UC"].includes(suffix)) && suffixList.every((suffix) => ["U", "SU", "UA", "UB", "UC"].includes(suffix));
+  if (!hasOnlyUpperSeries && hasUpperBerthSeries) {
+    const upperRows = [...new Set(parsed.map((item) => item.seat.row))].sort((a, b) => a - b);
+    const upperRowMap = new Map(upperRows.map((row, index) => [row, index === 0 ? 1 : 3]));
+    const upperColumns = [...new Set(parsed.map((item) => item.seat.column))].sort((a, b) => a - b);
+    const upperColumnMap = new Map(upperColumns.map((column, index) => [column, (index * 2) + 1]));
+    const columns = Math.max(2, upperColumns.length * 2);
+    const orderedSeats = parsed.map(({ seat, parts }) => ({
+      ...seat,
+      row: upperRowMap.get(seat.row) || (parts.suffix === "U" ? 1 : 3),
+      column: upperColumnMap.get(seat.column) || ((parts.number - 1) * 2) + 1,
+      width: 2,
+      height: 1,
+      isBerth: true,
+      visualType: "berth"
+    }));
+    const gridGap = 7;
+    const targetWidth = 720;
+    const compactSeatTrack = Math.max(18, Math.min(34, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
+    return {
+      seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
+      rows: 3,
+      columns,
+      columnTracks: Array.from({ length: columns }, () => `${compactSeatTrack}px`).join(" "),
+      rowTracks: `${compactSeatTrack}px 32px ${compactSeatTrack}px`,
+      aisleRow: 2,
+      rotated: false,
+      orderedByLabel: true
+    };
+  }
   if (hasOnlyUpperSeries) {
     const maxNumber = Math.max(...parsed.map((item) => item.parts.number));
     const groupCount = Math.ceil(maxNumber / 3);
@@ -953,27 +986,34 @@ function buildLabelOrderedDeckLayout(seats) {
   const slotMap = new Map(suffixes.map((suffix, index) => [suffix, suffixSlot(suffix, suffixes) || { row: index + 1, subColumn: 1 }]));
   const numbers = [...new Set(parsed.map((item) => item.parts.number))].sort((a, b) => a - b);
   const groupWidth = Math.max(...[...slotMap.values()].map((slot) => slot.subColumn || 1));
-  const hasBdsdLowerSeries = suffixes.some((suffix) => ["B", "A", "L"].includes(suffix));
+  const hasBdsdLowerSeries = suffixes.some((suffix) => ["B", "A", "L"].includes(suffix)) || (suffixes.includes("N") && suffixes.includes("L"));
   if (hasBdsdLowerSeries) {
-    const topNumbers = numbers.filter((number) => parsed.some((item) => item.parts.number === number && item.parts.suffix !== "L"));
-    const singleSideNumbers = numbers.filter((number) => parsed.some((item) => item.parts.number === number && item.parts.suffix === "L"));
-    const columns = Math.max(1, topNumbers.length, singleSideNumbers.length * 2);
+    const topRows = [...new Set(parsed.filter((item) => item.parts.suffix !== "L").map((item) => item.seat.row))].sort((a, b) => a - b);
+    const rowToSeaterRow = new Map(topRows.map((row, index) => [row, index === 0 ? 1 : 2]));
+    const topColumns = [...new Set(parsed.filter((item) => item.parts.suffix !== "L").map((item) => item.seat.column))].sort((a, b) => a - b);
+    const topColumnMap = new Map(topColumns.map((column, index) => [column, index + 1]));
+    const singleSideSeats = parsed
+      .filter((item) => item.parts.suffix === "L")
+      .sort((a, b) => a.seat.column - b.seat.column || a.parts.number - b.parts.number);
+    const singleSideColumnMap = new Map(singleSideSeats.map((item, index) => [item.parts.label, (index * 2) + 1]));
+    const columns = Math.max(1, topColumns.length, singleSideSeats.length * 2);
     const orderedSeats = parsed.map(({ seat, parts }) => {
       const isSingleSide = parts.suffix === "L";
-      const isBerth = Boolean(seat.isBerth);
+      const isBerth = isSingleSide || Boolean(seat.isBerth);
+      const seaterRow = parts.suffix === "B" ? 1 : parts.suffix === "A" ? 2 : rowToSeaterRow.get(seat.row) || 1;
       return {
         ...seat,
-        row: parts.suffix === "B" ? 1 : parts.suffix === "A" ? 2 : 4,
-        column: isSingleSide ? ((parts.number - 1) * 2) + 1 : parts.number,
+        row: isSingleSide ? 4 : seaterRow,
+        column: isSingleSide ? singleSideColumnMap.get(parts.label) || ((parts.number - 1) * 2) + 1 : topColumnMap.get(seat.column) || parts.number,
         width: isSingleSide && isBerth ? 2 : 1,
         height: 1,
         isBerth,
         visualType: isBerth ? "berth" : "seat"
       };
     });
-    const gridGap = 8;
-    const targetWidth = 680;
-    const seatTrack = Math.max(32, Math.min(44, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
+    const gridGap = columns > 18 ? 6 : 8;
+    const targetWidth = columns > 18 ? 760 : 680;
+    const seatTrack = Math.max(columns > 18 ? 18 : 28, Math.min(42, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
     return {
       seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
       rows: 4,
