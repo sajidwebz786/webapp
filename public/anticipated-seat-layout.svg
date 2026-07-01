@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="760" viewBox="0 0 1240 760">
+  <defs>
+    <style>
+      .bg{fill:#eef3fb}.deck{fill:#fff;stroke:#c7d0df;stroke-width:1.5}.sideLine{stroke:#edf1f7}
+      .title{font:800 30px Arial,sans-serif;fill:#111827;writing-mode:vertical-rl;transform:rotate(180deg)}
+      .note{font:800 24px Arial,sans-serif;fill:#0f172a}.driver{fill:#fff;stroke:#c7d0df;stroke-width:1.2}.driverText{font:800 15px Arial,sans-serif;fill:#64748b;text-anchor:middle}
+      .seat{fill:#fff;stroke:#078b43;stroke-width:2}.sold{fill:#ececf2;stroke:#dedee7;stroke-width:2}
+      .label{font:900 15px Arial,sans-serif;fill:#0f172a;text-anchor:middle}.soldLabel{fill:#a8adba}
+      .fare{font:700 10px Arial,sans-serif;fill:#64748b;text-anchor:middle}.pillow{fill:#d6f3df}
+      .aisle{fill:url(#aislePattern);stroke:#64748b;stroke-width:1;stroke-dasharray:4 4;opacity:.72}
+      .legendText{font:900 22px Arial,sans-serif;fill:#0f172a}.smallNote{font:700 15px Arial,sans-serif;fill:#475569}
+    </style>
+    <pattern id="aislePattern" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#f8fafc"/>
+      <rect y="0" width="16" height="7" fill="#d7dee9"/>
+    </pattern>
+  </defs>
+  <rect class="bg" width="1240" height="760"/>
+  <text x="44" y="48" class="note">Expected corrected seat map: every seat visible, only the center walkway is empty</text>
+  <text x="44" y="74" class="smallNote">Grey = sold/occupied. Green outline = available. Dashed center column = passenger walkway.</text>
+
+  <!-- Lower deck -->
+  <g transform="translate(44 100)">
+    <rect class="deck" width="1152" height="250" rx="18"/>
+    <line class="sideLine" x1="126" y1="20" x2="126" y2="230"/>
+    <text class="title" x="-205" y="72">Lower deck</text>
+    <rect class="driver" x="34" y="190" width="78" height="36" rx="18"/>
+    <text class="driverText" x="73" y="213">Driver</text>
+    <g transform="translate(166 36)">
+      <rect class="aisle" x="360" y="0" width="30" height="190" rx="15"/>
+
+      <!-- B row -->
+      <g>
+        <rect class="seat" x="0" y="0" width="52" height="42" rx="8"/><text class="label" x="26" y="25">B1</text>
+        <rect class="seat" x="60" y="0" width="52" height="42" rx="8"/><text class="label" x="86" y="25">B2</text>
+        <rect class="sold" x="120" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="146" y="25">B3</text>
+        <rect class="seat" x="180" y="0" width="52" height="42" rx="8"/><text class="label" x="206" y="25">B4</text>
+        <rect class="sold" x="240" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="266" y="25">B5</text>
+        <rect class="sold" x="300" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="326" y="25">B6</text>
+        <rect class="sold" x="400" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="426" y="25">B7</text>
+        <rect class="sold" x="460" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="486" y="25">B8</text>
+        <rect class="seat" x="520" y="0" width="52" height="42" rx="8"/><text class="label" x="546" y="25">B9</text>
+        <rect class="seat" x="580" y="0" width="52" height="42" rx="8"/><text class="label" x="606" y="25">B10</text>
+        <rect class="seat" x="640" y="0" width="52" height="42" rx="8"/><text class="label" x="666" y="25">B11</text>
+        <rect class="seat" x="700" y="0" width="52" height="42" rx="8"/><text class="label" x="726" y="25">B12</text>
+      </g>
+
+      <!-- A row -->
+      <g transform="translate(0 54)">
+        <rect class="seat" x="0" y="0" width="52" height="42" rx="8"/><text class="label" x="26" y="25">A1</text>
+        <rect class="seat" x="60" y="0" width="52" height="42" rx="8"/><text class="label" x="86" y="25">A2</text>
+        <rect class="seat" x="120" y="0" width="52" height="42" rx="8"/><text class="label" x="146" y="25">A3</text>
+        <rect class="sold" x="180" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="206" y="25">A4</text>
+        <rect class="seat" x="240" y="0" width="52" height="42" rx="8"/><text class="label" x="266" y="25">A5</text>
+        <rect class="sold" x="300" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="326" y="25">A6</text>
+        <rect class="seat" x="400" y="0" width="52" height="42" rx="8"/><text class="label" x="426" y="25">A7</text>
+        <rect class="seat" x="460" y="0" width="52" height="42" rx="8"/><text class="label" x="486" y="25">A8</text>
+        <rect class="sold" x="520" y="0" width="52" height="42" rx="8"/><text class="label soldLabel" x="546" y="25">A9</text>
+        <rect class="seat" x="580" y="0" width="52" height="42" rx="8"/><text class="label" x="606" y="25">A10</text>
+        <rect class="seat" x="640" y="0" width="52" height="42" rx="8"/><text class="label" x="666" y="25">A11</text>
+        <rect class="seat" x="700" y="0" width="52" height="42" rx="8"/><text class="label" x="726" y="25">A12</text>
+      </g>
+
+      <!-- L row -->
+      <g transform="translate(0 110)">
+        <rect class="seat" x="0" y="0" width="112" height="80" rx="9"/><text class="label" x="56" y="25">L1</text><text class="fare" x="56" y="50">Rs 1017.5</text><rect class="pillow" x="41" y="64" width="30" height="7" rx="4"/>
+        <rect class="sold" x="120" y="0" width="112" height="80" rx="9"/><text class="label soldLabel" x="176" y="25">L2</text><text class="fare" x="176" y="50">Sold</text><rect class="pillow" x="161" y="64" width="30" height="7" rx="4"/>
+        <rect class="sold" x="240" y="0" width="112" height="80" rx="9"/><text class="label soldLabel" x="296" y="25">L3</text><text class="fare" x="296" y="50">Sold</text><rect class="pillow" x="281" y="64" width="30" height="7" rx="4"/>
+        <rect class="seat" x="400" y="0" width="112" height="80" rx="9"/><text class="label" x="456" y="25">L4</text><text class="fare" x="456" y="50">Rs 1017.5</text><rect class="pillow" x="441" y="64" width="30" height="7" rx="4"/>
+        <rect class="seat" x="520" y="0" width="112" height="80" rx="9"/><text class="label" x="576" y="25">L5</text><text class="fare" x="576" y="50">Rs 1017.5</text><rect class="pillow" x="561" y="64" width="30" height="7" rx="4"/>
+        <rect class="seat" x="640" y="0" width="112" height="80" rx="9"/><text class="label" x="696" y="25">L6</text><text class="fare" x="696" y="50">Rs 1017.5</text><rect class="pillow" x="681" y="64" width="30" height="7" rx="4"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Upper deck -->
+  <g transform="translate(44 386)">
+    <rect class="deck" width="1152" height="220" rx="18"/>
+    <line class="sideLine" x1="126" y1="20" x2="126" y2="200"/>
+    <text class="title" x="-188" y="72">Upper deck</text>
+    <rect class="driver" x="34" y="164" width="78" height="36" rx="18"/>
+    <text class="driverText" x="73" y="187">Driver</text>
+    <g transform="translate(166 44)">
+      <rect class="aisle" x="204" y="0" width="30" height="156" rx="15"/>
+      <g>
+        <rect class="seat" x="0" y="0" width="58" height="44" rx="8"/><text class="label" x="29" y="20">U3</text><text class="fare" x="29" y="35">Rs 912.5</text>
+        <rect class="sold" x="68" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="97" y="20">U6</text>
+        <rect class="sold" x="136" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="165" y="20">U9</text>
+        <rect class="sold" x="244" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="273" y="20">U12</text>
+        <rect class="sold" x="312" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="341" y="20">U15</text>
+        <rect class="seat" x="380" y="0" width="58" height="44" rx="8"/><text class="label" x="409" y="20">U18</text><text class="fare" x="409" y="35">Rs 912.5</text>
+      </g>
+      <g transform="translate(0 56)">
+        <rect class="seat" x="0" y="0" width="58" height="44" rx="8"/><text class="label" x="29" y="20">U1</text><text class="fare" x="29" y="35">Rs 965</text>
+        <rect class="seat" x="68" y="0" width="58" height="44" rx="8"/><text class="label" x="97" y="20">U4</text><text class="fare" x="97" y="35">Rs 965</text>
+        <rect class="sold" x="136" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="165" y="20">U7</text>
+        <rect class="seat" x="244" y="0" width="58" height="44" rx="8"/><text class="label" x="273" y="20">U10</text><text class="fare" x="273" y="35">Rs 965</text>
+        <rect class="seat" x="312" y="0" width="58" height="44" rx="8"/><text class="label" x="341" y="20">U13</text><text class="fare" x="341" y="35">Rs 965</text>
+        <rect class="seat" x="380" y="0" width="58" height="44" rx="8"/><text class="label" x="409" y="20">U16</text><text class="fare" x="409" y="35">Rs 965</text>
+      </g>
+      <g transform="translate(0 112)">
+        <rect class="seat" x="0" y="0" width="58" height="44" rx="8"/><text class="label" x="29" y="20">U2</text><text class="fare" x="29" y="35">Rs 912.5</text>
+        <rect class="sold" x="68" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="97" y="20">U5</text>
+        <rect class="sold" x="136" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="165" y="20">U8</text>
+        <rect class="sold" x="244" y="0" width="58" height="44" rx="8"/><text class="label soldLabel" x="273" y="20">U11</text>
+        <rect class="seat" x="312" y="0" width="58" height="44" rx="8"/><text class="label" x="341" y="20">U14</text><text class="fare" x="341" y="35">Rs 912.5</text>
+        <rect class="seat" x="380" y="0" width="58" height="44" rx="8"/><text class="label" x="409" y="20">U17</text><text class="fare" x="409" y="35">Rs 912.5</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(294 648)">
+    <rect width="652" height="78" rx="20" fill="#fff"/>
+    <rect x="42" y="26" width="26" height="26" rx="7" fill="#fff" stroke="#078b43" stroke-width="2"/><text class="legendText" x="82" y="47">Available</text>
+    <rect x="216" y="26" width="26" height="26" rx="7" fill="#078b43"/><text class="legendText" x="256" y="47">Selected</text>
+    <rect x="376" y="26" width="26" height="26" rx="7" fill="#ececf2" stroke="#dedee7" stroke-width="2"/><text class="legendText" x="416" y="47">Sold</text>
+    <rect class="aisle" x="502" y="24" width="28" height="30" rx="8"/><text class="legendText" x="544" y="47">Walkway</text>
+  </g>
+</svg>

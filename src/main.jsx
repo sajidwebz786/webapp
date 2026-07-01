@@ -675,7 +675,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
 
   const goPassenger = () => {
     if (!user) {
-      setBookingResumeState?.({ routeId: route.id, step: "seats", selectedSeats, passengers, contact, boardingPoint, dropPoint });
+      setBookingResumeState?.({ routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint });
       setAuthReturnPage("booking");
       setPage("auth");
       return;
@@ -702,7 +702,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
         <div className="window-offer">Last min. 10% OFF</div>
       </div>
       <div className="wizard-tabs booking-tabs">
-        {(isBus ? ["points", "seats", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} onClick={() => item === "passenger" && !user ? (setBookingResumeState?.({ routeId: route.id, step: "seats", selectedSeats, passengers, contact, boardingPoint, dropPoint }), setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
+        {(isBus ? ["points", "seats", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} onClick={() => item === "passenger" && !user ? (setBookingResumeState?.({ routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint }), setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
       </div>
       {isBus && step === "points" && <BoardDropStep boardingPoints={boardingPoints} droppingPoints={droppingPoints} boardingPoint={boardingPoint} setBoardingPoint={setBoardingPoint} dropPoint={dropPoint} setDropPoint={setDropPoint} />}
       {isBus && step === "seats" && <div className="dedicated-seat-screen"><PortraitSeatChart route={route} selected={selectedSeats} setSelected={setSelectedSeats} /><BusProfilePanel route={route} /></div>}
@@ -724,6 +724,18 @@ function numberFrom(...values) {
   return null;
 }
 
+function booleanFrom(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    const normalized = String(value).trim().toLowerCase();
+    if (["true", "1", "yes", "y", "available"].includes(normalized)) return true;
+    if (["false", "0", "no", "n", "unavailable"].includes(normalized)) return false;
+  }
+  return false;
+}
+
 function extractSeatList(seatLayout) {
   if (!seatLayout) return [];
   const result = seatLayout.Result || {};
@@ -737,7 +749,8 @@ function seatVisualType(seat, rawType) {
   const htmlClass = String(seat.htmlClass || seat.className || "").toLowerCase();
   const seatName = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.label || seat.id || "");
   if (seat.visualType) return seat.visualType;
-  if (/^[LU]\d+$/i.test(seatName)) return "berth";
+  if (/^[LU]\d+$/i.test(seatName) && !type && !htmlClass) return "berth";
+  if (/^[LU]\d+$/i.test(seatName) && !/(seat|chair|seater)/i.test(type)) return "berth";
   if (type.includes("sleeper") || type.includes("berth") || htmlClass.includes("sleeper") || htmlClass.includes("berth")) return "berth";
   if (/\bb?hseat\b/.test(htmlClass) || type.includes("horizontal") || type === "2") return "horizontal-seat";
   return "seat";
@@ -749,7 +762,9 @@ function normalizeApiSeat(seat, index) {
   if (!Number.isFinite(column) || !Number.isFinite(row)) return null;
   const width = Math.max(1, numberFrom(seat.Width, seat.SeatWidth, seat.width, seat.w) || 1);
   const height = Math.max(1, numberFrom(seat.Height, seat.SeatHeight, seat.height, seat.h) || 1);
-  const isUpper = Boolean(seat.IsUpper || seat.Upper || seat.IsUpperDeck || String(seat.Deck || seat.deck || "").toLowerCase().includes("upper") || String(seat.DeckNo || "").toLowerCase() === "1");
+  const deckText = String(seat.Deck || seat.deck || "").toLowerCase();
+  const deckNoText = String(seat.DeckNo || "").toLowerCase();
+  const isUpper = booleanFrom(seat.IsUpper, seat.Upper, seat.IsUpperDeck) || deckText.includes("upper") || deckNoText === "1";
   const id = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.id || seat.SeatIndex || index + 1);
   const rawType = String(seat.SeatType || seat.Type || seat.BerthType || seat.rawType || "").toLowerCase();
   const visualType = seatVisualType(seat, rawType);
@@ -837,9 +852,203 @@ function resolveSeatCollisions(seats) {
   return placed;
 }
 
+function seatLabelParts(seat) {
+  const label = String(seat.SeatName || seat.label || seat.id || "").trim().toUpperCase();
+  const numberFirst = label.match(/^(\d+)([A-Z]+)$/);
+  if (numberFirst) return { number: Number(numberFirst[1]), prefix: "", suffix: numberFirst[2], label };
+  const letterFirst = label.match(/^([A-Z]+)(\d+)$/);
+  if (letterFirst) return { number: Number(letterFirst[2]), prefix: letterFirst[1], suffix: letterFirst[1], label };
+  return null;
+}
+
+function suffixOrder(suffix, suffixes) {
+  const bdsdLowerOrder = ["B", "A", "L"];
+  const upperDeckOrder = ["UC", "UB", "UA", "U"];
+  const lowerDeckOrder = ["E", "G", "D", "F", "LA", "LB", "LC"];
+  const mixedOrder = ["C", "B", "A", "E", "G", "D", "F", "LA", "LB", "LC", "U", "L"];
+  const order = suffixes.some((item) => upperDeckOrder.includes(item))
+    ? upperDeckOrder
+    : suffixes.some((item) => bdsdLowerOrder.includes(item))
+      ? bdsdLowerOrder
+      : suffixes.some((item) => lowerDeckOrder.includes(item))
+      ? lowerDeckOrder
+      : mixedOrder;
+  const index = order.indexOf(suffix);
+  return index >= 0 ? index : order.length;
+}
+
+function suffixSlot(suffix, suffixes) {
+  if (suffixes.some((item) => ["B", "A", "L"].includes(item))) {
+    const bdsdLowerSlots = {
+      B: { row: 1, subColumn: 1 },
+      A: { row: 2, subColumn: 1 },
+      L: { row: 3, subColumn: 1, sleeper: true }
+    };
+    return bdsdLowerSlots[suffix] || null;
+  }
+  if (suffixes.some((item) => ["E", "G", "D", "F", "LA", "LB", "LC"].includes(item))) {
+    const lowerSlots = {
+      E: { row: 1, subColumn: 1 },
+      G: { row: 1, subColumn: 2 },
+      D: { row: 2, subColumn: 1 },
+      F: { row: 2, subColumn: 2 },
+      LA: { row: 3, subColumn: 1 },
+      LB: { row: 3, subColumn: 2 },
+      LC: { row: 4, subColumn: 1 }
+    };
+    return lowerSlots[suffix] || null;
+  }
+  if (suffixes.some((item) => ["UC", "UB", "UA"].includes(item))) {
+    const upperSlots = {
+      UC: { row: 1, subColumn: 1 },
+      UB: { row: 2, subColumn: 1 },
+      UA: { row: 3, subColumn: 1 }
+    };
+    return upperSlots[suffix] || null;
+  }
+  return null;
+}
+
+function buildLabelOrderedDeckLayout(seats) {
+  const parsed = seats.map((seat) => ({ seat, parts: seatLabelParts(seat) })).filter((item) => item.parts);
+  if (parsed.length < Math.max(4, Math.ceil(seats.length * 0.7))) return null;
+
+  const suffixList = [...new Set(parsed.map((item) => item.parts.suffix))];
+  const hasOnlyUpperSeries = suffixList.length === 1 && suffixList[0] === "U";
+  if (hasOnlyUpperSeries) {
+    const maxNumber = Math.max(...parsed.map((item) => item.parts.number));
+    const groupCount = Math.ceil(maxNumber / 3);
+    const columns = groupCount * 2;
+    const orderedSeats = parsed.map(({ seat, parts }) => {
+      const sequence = Math.max(0, parts.number - 1);
+      const remainder = sequence % 3;
+      const groupIndex = Math.floor(sequence / 3);
+      const isTopBerth = remainder === 2;
+      return {
+        ...seat,
+        row: isTopBerth ? 1 : remainder === 0 ? 3 : 4,
+        column: (groupIndex * 2) + 1,
+        width: isTopBerth || seat.isBerth ? 2 : 1,
+        height: 1,
+        isBerth: Boolean(isTopBerth || seat.isBerth),
+        visualType: isTopBerth || seat.isBerth ? "berth" : "seat"
+      };
+    });
+    const gridGap = 8;
+    const targetWidth = 620;
+    const compactSeatTrack = Math.max(32, Math.min(46, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
+    return {
+      seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
+      rows: 4,
+      columns,
+      columnTracks: Array.from({ length: columns }, () => `${compactSeatTrack}px`).join(" "),
+      rowTracks: `${compactSeatTrack}px 34px ${compactSeatTrack}px ${compactSeatTrack}px`,
+      aisleRow: 2,
+      rotated: false,
+      orderedByLabel: true
+    };
+  }
+
+  const suffixes = suffixList.sort((a, b) => suffixOrder(a, suffixList) - suffixOrder(b, suffixList) || a.localeCompare(b));
+  const slotMap = new Map(suffixes.map((suffix, index) => [suffix, suffixSlot(suffix, suffixes) || { row: index + 1, subColumn: 1 }]));
+  const numbers = [...new Set(parsed.map((item) => item.parts.number))].sort((a, b) => a - b);
+  const groupWidth = Math.max(...[...slotMap.values()].map((slot) => slot.subColumn || 1));
+  const hasBdsdLowerSeries = suffixes.some((suffix) => ["B", "A", "L"].includes(suffix));
+  if (hasBdsdLowerSeries) {
+    const topNumbers = numbers.filter((number) => parsed.some((item) => item.parts.number === number && item.parts.suffix !== "L"));
+    const singleSideNumbers = numbers.filter((number) => parsed.some((item) => item.parts.number === number && item.parts.suffix === "L"));
+    const columns = Math.max(1, topNumbers.length, singleSideNumbers.length * 2);
+    const orderedSeats = parsed.map(({ seat, parts }) => {
+      const isSingleSide = parts.suffix === "L";
+      const isBerth = Boolean(seat.isBerth);
+      return {
+        ...seat,
+        row: parts.suffix === "B" ? 1 : parts.suffix === "A" ? 2 : 4,
+        column: isSingleSide ? ((parts.number - 1) * 2) + 1 : parts.number,
+        width: isSingleSide && isBerth ? 2 : 1,
+        height: 1,
+        isBerth,
+        visualType: isBerth ? "berth" : "seat"
+      };
+    });
+    const gridGap = 8;
+    const targetWidth = 680;
+    const seatTrack = Math.max(32, Math.min(44, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
+    return {
+      seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
+      rows: 4,
+      columns,
+      columnTracks: Array.from({ length: columns }, () => `${seatTrack}px`).join(" "),
+      rowTracks: `${seatTrack}px ${seatTrack}px 34px ${seatTrack}px`,
+      aisleRow: 3,
+      rotated: false,
+      orderedByLabel: true
+    };
+  }
+  const lowerSeatNumbers = hasBdsdLowerSeries
+    ? numbers.filter((number) => parsed.some((item) => item.parts.number === number && item.parts.suffix !== "L"))
+    : numbers;
+  const lowerAisleAfter = hasBdsdLowerSeries ? Math.ceil(lowerSeatNumbers.length / 2) : null;
+  const numberToColumn = new Map(lowerSeatNumbers.map((number, index) => {
+    const baseColumn = (index * groupWidth) + 1;
+    return [number, hasBdsdLowerSeries && index >= lowerAisleAfter ? baseColumn + 1 : baseColumn];
+  }));
+  const rowCount = Math.max(...[...slotMap.values()].map((slot) => slot.row || 1));
+  const columns = Math.max(1, lowerSeatNumbers.length * groupWidth, ...parsed.map(({ parts }) => {
+    const slot = slotMap.get(parts.suffix);
+    if (hasBdsdLowerSeries && parts.suffix === "L") {
+      const sleeperBaseColumn = ((parts.number - 1) * 2) + (slot?.subColumn || 1);
+      return parts.number > Math.ceil(numbers.filter((number) => parsed.some((item) => item.parts.number === number && item.parts.suffix === "L")).length / 2)
+        ? sleeperBaseColumn + 1
+        : sleeperBaseColumn;
+    }
+    return (numberToColumn.get(parts.number) || 1) + ((slot?.subColumn || 1) - 1);
+  }));
+  const hasBerths = seats.some((seat) => seat.isBerth);
+  const targetWidth = hasBerths ? 690 : 580;
+  const gridGap = 8;
+  const aisleColumn = hasBdsdLowerSeries ? lowerAisleAfter + 1 : null;
+  const aisleTrack = 64;
+  const trackCount = aisleColumn ? columns - 1 : columns;
+  const compactSeatTrack = Math.max(24, Math.min(34, Math.floor((targetWidth - (aisleColumn ? aisleTrack : 0) - Math.max(0, columns - 1) * gridGap) / Math.max(trackCount, 1))));
+  const rowTrack = hasBerths ? "24px" : "30px";
+  const columnTracks = Array.from({ length: columns }, (_, index) => aisleColumn && index + 1 === aisleColumn ? `${aisleTrack}px` : `${compactSeatTrack}px`).join(" ");
+  const sleeperNumbers = numbers.filter((number) => parsed.some((item) => item.parts.number === number && item.parts.suffix === "L"));
+  const sleeperAisleAfter = Math.ceil(sleeperNumbers.length / 2);
+  const orderedSeats = parsed.map(({ seat, parts }) => {
+    const slot = slotMap.get(parts.suffix) || { row: 1, subColumn: 1 };
+    const column = hasBdsdLowerSeries && parts.suffix === "L"
+      ? (((parts.number - 1) * 2) + (slot.subColumn || 1) + (parts.number > sleeperAisleAfter ? 1 : 0))
+      : (numberToColumn.get(parts.number) || 1) + ((slot.subColumn || 1) - 1);
+    return {
+      ...seat,
+      row: slot.row || 1,
+      column,
+      width: hasBdsdLowerSeries && parts.suffix === "L" ? 2 : 1,
+      height: slot.sleeper ? 2 : 1,
+      isBerth: Boolean(slot.sleeper),
+      visualType: slot.sleeper ? "berth" : "seat"
+    };
+  });
+  const actualRowCount = Math.max(...orderedSeats.map((seat) => seat.row + (seat.height || 1) - 1));
+
+  return {
+    seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
+    rows: Math.max(rowCount, actualRowCount),
+    columns,
+    aisleColumn,
+    columnTracks,
+    rowTrack,
+    rotated: false,
+    orderedByLabel: true
+  };
+}
+
 function buildDeckLayout(seats) {
   const measuredSeats = seats.map(normalizeApiSeat).filter(Boolean);
   if (!measuredSeats.length) return { seats: [], rows: [], columns: 0 };
+  const labelOrderedLayout = buildLabelOrderedDeckLayout(measuredSeats);
+  if (labelOrderedLayout) return labelOrderedLayout;
 
   const rawRows = [...new Set(measuredSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   const rawColumns = [...new Set(measuredSeats.map((seat) => seat.column))].sort((a, b) => a - b);
@@ -973,7 +1182,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
   const renderSeat = (seat) => {
     const sold = unavailable.has(seat.id);
     const chosen = selected.includes(seat.id);
-    const women = Boolean(seat.IsLadiesSeat || seat.ladies);
+    const women = booleanFrom(seat.IsLadiesSeat, seat.LadiesSeat, seat.IsLadies, seat.ForLadies, seat.ladies);
     const isBerth = Boolean(seat.isBerth);
     const isHorizontalSeat = !isBerth && seat.visualType === "horizontal-seat";
     const isHorizontalBerth = isBerth && (seat.width || 1) > (seat.height || 1);
@@ -1007,10 +1216,20 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
       <div className="deck-seat-scroll" aria-label={`${title} seat layout`}>
         <div className="portrait-seat-grid live-seat-grid" style={{
           gridTemplateColumns: layout.columnTracks || `repeat(${layout.columns || 4}, 46px)`,
-          gridTemplateRows: `repeat(${layout.rows || 1}, ${layout.rowTrack || "46px"})`,
+          gridTemplateRows: layout.rowTracks || `repeat(${layout.rows || 1}, ${layout.rowTrack || "46px"})`,
           gap: "8px 10px",
           justifyContent: "start",
         }}>
+          {layout.aisleRow && <div className="bus-aisle horizontal-aisle" style={{
+            gridColumnStart: 1,
+            gridColumnEnd: `span ${layout.columns || 1}`,
+            gridRowStart: layout.aisleRow
+          }} aria-label="Passenger walkway"><span>Passenger walkway</span></div>}
+          {!layout.aisleRow && layout.aisleColumn && <div className="bus-aisle" style={{
+            gridColumnStart: layout.aisleColumn,
+            gridRowStart: 1,
+            gridRowEnd: `span ${layout.rows || 1}`
+          }} aria-label="Bus walkway" />}
           {layout.seats.map(renderSeat)}
         </div>
       </div>
@@ -1192,6 +1411,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
   const [popularTab, setPopularTab] = useState("boarding");
   const [selectedPoint, setSelectedPoint] = useState("");
   const [busPartner, setBusPartner] = useState("");
+  const [expandedStateBoards, setExpandedStateBoards] = useState({});
   const routeMinPrice = Math.min(...results.map((route) => Number(route.price || 0)), 0);
   const routeMaxPrice = Math.max(...results.map((route) => Number(route.price || 0)), 0);
   const [minPrice, setMinPrice] = useState(routeMinPrice);
@@ -1207,6 +1427,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
     setSelectedPoint("");
     setBusPartner("");
     setFilters([]);
+    setExpandedStateBoards({});
   }, [type, routeMinPrice, routeMaxPrice, results.length]);
 
   if (!results.length) return null;
@@ -1242,9 +1463,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
   const droppingPoints = [...new Set(results.flatMap((route) => routeDroppingPoints(route).map((point) => point.name.split(" ")[0])))].slice(0, 8);
   const operators = [...new Set(results.map((route) => route.providerName))].slice(0, 8);
 
-  const operatorFiltered = type === "bus" && stateTabs.length
-    ? results.filter((route) => activeOperator === "all" ? true : activeOperator === "private" ? !operatorBrand(route) : operatorBrand(route)?.key === activeOperator)
-    : results;
+  const operatorFiltered = results;
 
   const filtered = operatorFiltered
     .filter((route) => Number(route.price) >= minPrice && Number(route.price) <= maxPrice)
@@ -1277,6 +1496,39 @@ function JourneyResults({ type, results, query, onViewSeats }) {
     { title: "Advance Booking", tone: "advance", icon: CalendarDays },
     { title: "Price Drop", tone: "drop", icon: Percent }
   ];
+
+  const stateBoardGroups = type === "bus"
+    ? operatorBrands.map((brand) => ({
+      brand,
+      routes: filtered.filter((route) => operatorBrand(route)?.key === brand.key)
+    })).filter((group) => group.routes.length)
+    : [];
+  const privateRoutes = type === "bus" ? filtered.filter((route) => !operatorBrand(route)) : filtered;
+  const visibleResultCount = type === "bus"
+    ? privateRoutes.length + stateBoardGroups.reduce((count, group) => count + group.routes.length, 0)
+    : filtered.length;
+  const renderRouteCard = (route) => {
+    const brand = operatorBrand(route);
+    const seatsLeft = availableSeats(route);
+    return (
+      <article key={route.id} className={`result-card ${route.type}`}>
+        <div className="result-card-head">
+          <span className="operator-title">{brand && <img src={brand.logo} alt={`${brand.title} logo`} />}{route.providerName}</span>
+          <span className="rating-badge"><Star size={14} strokeWidth={2.5} /> {formatRating(route.rating)}</span>
+        </div>
+        <div className="result-card-meta">
+          <span>{route.vehicleType} · {route.classType}</span>
+          {type === "bus" && seatsLeft > 0 && <span className="seats-left"><Armchair size={14} /> {seatsLeft} seats left</span>}
+        </div>
+        <div className="time-row"><b>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b><span>{route.origin} to {route.destination}</span><b>{new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b></div>
+        <div className="amenities">{route.amenities?.map((item) => <span key={item}>{item}</span>)}</div>
+        <div className="fare-row">
+          <div><small>From</small><strong>₹{Number(route.price).toLocaleString("en-IN")}</strong></div>
+          <button onClick={() => onViewSeats(route)}>{type === "bus" ? "Select Seats" : type === "flight" ? "Book Flight" : "Book Train"}</button>
+        </div>
+      </article>
+    );
+  };
 
   return (
     <section className="journey-results">
@@ -1372,7 +1624,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
               {label} ↑
             </button>
           ))}
-          <span className="result-count"><Bus size={16} /> Showing {filtered.length} {type === "bus" ? "buses" : type === "flight" ? "flights" : "trains"}{query?.from && query?.to ? ` · ${query.from} to ${query.to}` : ""} on this route</span>
+          <span className="result-count"><Bus size={16} /> Showing {visibleResultCount} {type === "bus" ? "buses" : type === "flight" ? "flights" : "trains"}{query?.from && query?.to ? ` · ${query.from} to ${query.to}` : ""} on this route</span>
         </div>
 
         {type === "bus" && (
@@ -1390,40 +1642,38 @@ function JourneyResults({ type, results, query, onViewSeats }) {
           </div>
         )}
 
-        {type === "bus" && stateTabs.length > 0 && (
-          <div className="operator-tabs">
-            <button className={activeOperator === "all" ? "active" : ""} onClick={() => setActiveOperator("all")}>All buses</button>
-            <button className={activeOperator === "private" ? "active" : ""} onClick={() => setActiveOperator("private")}>Private buses</button>
-            {stateTabs.map((brand) => <button key={brand.key} className={activeOperator === brand.key ? "active" : ""} onClick={() => setActiveOperator(brand.key)}><img src={brand.logo} alt={`${brand.title} logo`} /> {brand.title}</button>)}
-          </div>
-        )}
-
         <div className="mini-offers"><article>Free cancellation</article><article>Flexible date change</article><article>Women traveller care</article></div>
 
         <div className="result-list">
-          {filtered.map((route) => {
-            const brand = operatorBrand(route);
-            const seatsLeft = availableSeats(route);
+          {stateBoardGroups.map(({ brand, routes }) => {
+            const expanded = Boolean(expandedStateBoards[brand.key]);
+            const minFare = Math.min(...routes.map((route) => Number(route.price || 0)));
+            const totalSeats = routes.reduce((count, route) => count + availableSeats(route), 0);
+            const bestRating = Math.max(...routes.map((route) => Number(route.rating || 0)));
             return (
-              <article key={route.id} className={`result-card ${route.type}`}>
-                <div className="result-card-head">
-                  <span className="operator-title">{brand && <img src={brand.logo} alt={`${brand.title} logo`} />}{route.providerName}</span>
-                  <span className="rating-badge"><Star size={14} strokeWidth={2.5} /> {formatRating(route.rating)}</span>
-                </div>
-                <div className="result-card-meta">
-                  <span>{route.vehicleType} · {route.classType}</span>
-                  {type === "bus" && seatsLeft > 0 && <span className="seats-left"><Armchair size={14} /> {seatsLeft} seats left</span>}
-                </div>
-                <div className="time-row"><b>{new Date(route.departureTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b><span>{route.origin} to {route.destination}</span><b>{new Date(route.arrivalTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</b></div>
-                <div className="amenities">{route.amenities?.map((item) => <span key={item}>{item}</span>)}</div>
-                <div className="fare-row">
-                  <div><small>From</small><strong>₹{Number(route.price).toLocaleString("en-IN")}</strong></div>
-                  <button onClick={() => onViewSeats(route)}>{type === "bus" ? "Select Seats" : type === "flight" ? "Book Flight" : "Book Train"}</button>
-                </div>
-              </article>
+              <section key={brand.key} className={`state-board-block ${expanded ? "open" : ""}`}>
+                <button
+                  type="button"
+                  className="state-board-card"
+                  onClick={() => setExpandedStateBoards((current) => ({ ...current, [brand.key]: !current[brand.key] }))}
+                  aria-expanded={expanded}
+                >
+                  <span className="state-board-logo"><img src={brand.logo} alt={`${brand.title} logo`} /></span>
+                  <span className="state-board-copy">
+                    <strong>{brand.title}</strong>
+                    <small>{brand.subtitle}</small>
+                    <em>{routes.length} buses · {totalSeats} seats available {bestRating ? `· ★ ${formatRating(bestRating)}` : ""}</em>
+                  </span>
+                  <span className="state-board-price"><small>From</small><b>₹{Number(minFare).toLocaleString("en-IN")}</b></span>
+                  <span className="state-board-action">View buses <ChevronDown size={18} /></span>
+                </button>
+                {expanded && <div className="state-board-routes">{routes.map(renderRouteCard)}</div>}
+              </section>
             );
           })}
-          {!filtered.length && <div className="empty-results">No services match these filters. Remove one filter to see more options.</div>}
+          {type === "bus" && privateRoutes.length > 0 && stateBoardGroups.length > 0 && <div className="private-result-heading"><span>Private bus results</span><b>{privateRoutes.length} buses</b></div>}
+          {privateRoutes.map(renderRouteCard)}
+          {!visibleResultCount && <div className="empty-results">No services match these filters. Remove one filter to see more options.</div>}
         </div>
       </div>
     </section>
@@ -1836,32 +2086,43 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
           routeLine: routeLineText
         })
       });
-      await loadRazorpayCheckout();
-      const payment = await new Promise((resolve, reject) => {
-        const checkout = new window.Razorpay({
-          key: order.keyId,
-          amount: order.amount,
-          currency: order.currency || "INR",
-          name: "Orbita Travels",
-          description: routeLineText,
-          order_id: order.id,
-          prefill: {
-            name: user.name,
-            email: user.email,
-            contact: draft.contact?.phone || user.phone || ""
-          },
-          notes: {
-            type: draftType,
-            route: routeLineText
-          },
-          theme: { color: "#0f62b7" },
-          handler: (response) => resolve(response),
-          modal: {
-            ondismiss: () => reject(new Error("Payment was not completed"))
-          }
+      const isRazorpayTestMode = String(order.keyId || "").startsWith("rzp_test_") || order.testMode;
+      let payment;
+      if (isRazorpayTestMode) {
+        payment = {
+          razorpay_order_id: order.id,
+          razorpay_payment_id: `pay_test_${Date.now()}`,
+          razorpay_signature: "test_mode",
+          simulated: true
+        };
+      } else {
+        await loadRazorpayCheckout();
+        payment = await new Promise((resolve, reject) => {
+          const checkout = new window.Razorpay({
+            key: order.keyId,
+            amount: order.amount,
+            currency: order.currency || "INR",
+            name: "Orbita Travels",
+            description: routeLineText,
+            order_id: order.id,
+            prefill: {
+              name: user.name,
+              email: user.email,
+              contact: draft.contact?.phone || user.phone || ""
+            },
+            notes: {
+              type: draftType,
+              route: routeLineText
+            },
+            theme: { color: "#0f62b7" },
+            handler: (response) => resolve(response),
+            modal: {
+              ondismiss: () => reject(new Error("Payment was not completed"))
+            }
+          });
+          checkout.open();
         });
-        checkout.open();
-      });
+      }
       const booking = await api("/bookings", {
         method: "POST",
         body: JSON.stringify({

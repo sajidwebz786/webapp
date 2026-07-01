@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Corrected Passenger Walkway Seat Layout</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: #eef3fb; color: #111827; font-family: Arial, sans-serif; }
+    main { max-width: 1180px; margin: 0 auto; display: grid; gap: 18px; }
+    h1 { margin: 0; font-size: 24px; line-height: 1.2; }
+    p { margin: 6px 0 0; color: #526173; font-size: 14px; font-weight: 700; }
+    .deck-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 18px; padding: 18px; box-shadow: 0 10px 24px rgba(20, 36, 65, .08); overflow-x: auto; }
+    .deck-title { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+    .deck-title h2 { margin: 0; font-size: 19px; }
+    .deck-title span { color: #64748b; font-size: 13px; font-weight: 800; }
+    .bus-frame { width: max-content; min-width: 0; display: grid; grid-template-columns: 74px minmax(0, auto); gap: 18px; align-items: stretch; padding: 14px 18px; border: 3px solid #1f2937; border-radius: 18px; background: #fff; }
+    .driver-area { border-right: 4px solid #111827; min-height: 190px; display: grid; place-items: center; color: #111827; font-size: 13px; font-weight: 900; writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: .04em; }
+    .layout { display: grid; gap: 8px; }
+    .row { display: grid; gap: 12px; align-items: center; }
+    .row-12 { grid-template-columns: repeat(12, 50px); }
+    .row-6 { grid-template-columns: repeat(6, 50px); }
+    .row-berth { grid-template-columns: repeat(6, 112px); }
+    .walkway { height: 40px; display: grid; place-items: center; color: #111827; font-size: 16px; line-height: 1.05; font-weight: 950; text-align: center; text-transform: uppercase; letter-spacing: .01em; }
+    .walkway:before, .walkway:after { content: ""; display: block; width: 100%; height: 1px; background: #e2e8f0; }
+    .walkway span { display: inline-block; padding: 0 18px; background: #fff; }
+    .seat { width: 50px; height: 50px; border: 4px solid #111827; border-radius: 0; background: #fff; display: grid; place-items: center; color: #111827; font-size: 12px; font-weight: 900; }
+    .berth { width: 112px; height: 56px; border: 4px solid #111827; border-radius: 0; background: #fff; display: grid; place-items: center; color: #111827; font-size: 13px; font-weight: 900; }
+    .muted { border-color: #9ca3af; color: #9ca3af; }
+    .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px; padding: 16px; border-radius: 16px; background: #fff; border: 1px solid #e2e8f0; color: #334155; font-size: 14px; font-weight: 850; }
+    .legend span { display: inline-flex; align-items: center; gap: 8px; }
+    .legend i { width: 22px; height: 22px; border: 3px solid #111827; display: inline-block; }
+    .legend .berth-key { width: 42px; }
+    @media (max-width: 880px) {
+      body { padding: 12px; }
+      .bus-frame { grid-template-columns: 52px minmax(0, auto); gap: 12px; padding: 12px; }
+      .driver-area { min-height: 170px; font-size: 11px; }
+      .row { gap: 8px; }
+      .row-12 { grid-template-columns: repeat(12, 38px); }
+      .row-6 { grid-template-columns: repeat(6, 38px); }
+      .row-berth { grid-template-columns: repeat(6, 86px); }
+      .seat { width: 38px; height: 38px; border-width: 3px; font-size: 10px; }
+      .berth { width: 86px; height: 48px; border-width: 3px; font-size: 11px; }
+      .walkway { height: 36px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Correct model: 2 rows + horizontal passenger walkway + 1 row</h1>
+      <p>The passenger path is horizontal across the bus length. The lower side can be seats or berths depending on the API seat type.</p>
+    </header>
+
+    <section class="deck-card">
+      <div class="deck-title">
+        <h2>Lower deck - seater version</h2>
+        <span>Two rows on one side, walkway, one row on the other side</span>
+      </div>
+      <div class="bus-frame">
+        <div class="driver-area">DRIVER SIDE</div>
+        <div class="layout">
+          <div class="row row-12">
+            <div class="seat">B1</div><div class="seat">B2</div><div class="seat muted">B3</div><div class="seat">B4</div><div class="seat muted">B5</div><div class="seat muted">B6</div>
+            <div class="seat muted">B7</div><div class="seat muted">B8</div><div class="seat">B9</div><div class="seat">B10</div><div class="seat">B11</div><div class="seat">B12</div>
+          </div>
+          <div class="row row-12">
+            <div class="seat">A1</div><div class="seat">A2</div><div class="seat">A3</div><div class="seat muted">A4</div><div class="seat">A5</div><div class="seat muted">A6</div>
+            <div class="seat">A7</div><div class="seat">A8</div><div class="seat muted">A9</div><div class="seat">A10</div><div class="seat">A11</div><div class="seat">A12</div>
+          </div>
+          <div class="walkway"><span>Passenger<br/>Walk Way</span></div>
+          <div class="row row-6">
+            <div class="seat">L1</div><div class="seat muted">L2</div><div class="seat muted">L3</div><div class="seat">L4</div><div class="seat">L5</div><div class="seat">L6</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="deck-card">
+      <div class="deck-title">
+        <h2>Lower deck - berth version</h2>
+        <span>Same walkway rule, but the single-side row becomes berth rectangles</span>
+      </div>
+      <div class="bus-frame">
+        <div class="driver-area">DRIVER SIDE</div>
+        <div class="layout">
+          <div class="row row-12">
+            <div class="seat">B1</div><div class="seat">B2</div><div class="seat muted">B3</div><div class="seat">B4</div><div class="seat muted">B5</div><div class="seat muted">B6</div>
+            <div class="seat muted">B7</div><div class="seat muted">B8</div><div class="seat">B9</div><div class="seat">B10</div><div class="seat">B11</div><div class="seat">B12</div>
+          </div>
+          <div class="row row-12">
+            <div class="seat">A1</div><div class="seat">A2</div><div class="seat">A3</div><div class="seat muted">A4</div><div class="seat">A5</div><div class="seat muted">A6</div>
+            <div class="seat">A7</div><div class="seat">A8</div><div class="seat muted">A9</div><div class="seat">A10</div><div class="seat">A11</div><div class="seat">A12</div>
+          </div>
+          <div class="walkway"><span>Passenger<br/>Walk Way</span></div>
+          <div class="row row-berth">
+            <div class="berth">L1</div><div class="berth muted">L2</div><div class="berth muted">L3</div><div class="berth">L4</div><div class="berth">L5</div><div class="berth">L6</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="deck-card">
+      <div class="deck-title">
+        <h2>2 + 2 version</h2>
+        <span>For buses with two rows on both sides of the same horizontal walkway</span>
+      </div>
+      <div class="bus-frame">
+        <div class="driver-area">DRIVER SIDE</div>
+        <div class="layout">
+          <div class="row row-12">
+            <div class="seat">B1</div><div class="seat">B2</div><div class="seat">B3</div><div class="seat">B4</div><div class="seat">B5</div><div class="seat">B6</div>
+            <div class="seat">B7</div><div class="seat">B8</div><div class="seat">B9</div><div class="seat">B10</div><div class="seat">B11</div><div class="seat">B12</div>
+          </div>
+          <div class="row row-12">
+            <div class="seat">A1</div><div class="seat">A2</div><div class="seat">A3</div><div class="seat">A4</div><div class="seat">A5</div><div class="seat">A6</div>
+            <div class="seat">A7</div><div class="seat">A8</div><div class="seat">A9</div><div class="seat">A10</div><div class="seat">A11</div><div class="seat">A12</div>
+          </div>
+          <div class="walkway"><span>Passenger<br/>Walk Way</span></div>
+          <div class="row row-12">
+            <div class="seat">C1</div><div class="seat">C2</div><div class="seat">C3</div><div class="seat">C4</div><div class="seat">C5</div><div class="seat">C6</div>
+            <div class="seat">C7</div><div class="seat">C8</div><div class="seat">C9</div><div class="seat">C10</div><div class="seat">C11</div><div class="seat">C12</div>
+          </div>
+          <div class="row row-12">
+            <div class="seat">D1</div><div class="seat">D2</div><div class="seat">D3</div><div class="seat">D4</div><div class="seat">D5</div><div class="seat">D6</div>
+            <div class="seat">D7</div><div class="seat">D8</div><div class="seat">D9</div><div class="seat">D10</div><div class="seat">D11</div><div class="seat">D12</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="legend">
+      <span><i></i>Seat</span>
+      <span><i class="berth-key"></i>Berth</span>
+      <span><i style="border-color:#9ca3af"></i>Sold / occupied</span>
+    </section>
+  </main>
+</body>
+</html>
