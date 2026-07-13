@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orbita Ticket Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 28px; background: #eef2f8; color: #111827; font-family: "Segoe UI", Arial, sans-serif; }
+    .operator-ticket { width: 880px; margin: 0 auto; background: white; color: #111827; border: 1px solid #d8dee9; box-shadow: 0 18px 44px rgba(13, 41, 82, .14); overflow: hidden; font-size: 13px; line-height: 1.35; }
+    .ticket-print-meta { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; padding: 12px 16px; font-size: 11px; color: #111827; }
+    .ticket-print-meta b { text-align: center; }
+    .ticket-print-meta span:last-child { text-align: right; }
+    .ticket-promo-banner { min-height: 128px; padding: 24px 32px; display: flex; align-items: center; justify-content: space-between; gap: 22px; background: linear-gradient(135deg, #e31b37 0%, #c9152f 46%, #0f62b7 100%); color: white; overflow: hidden; }
+    .ticket-promo-banner strong { display: block; font-size: 28px; line-height: 1; letter-spacing: .02em; }
+    .ticket-promo-banner span { display: block; margin-top: 8px; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .ticket-promo-banner i { position: relative; flex: 0 0 252px; height: 82px; border-radius: 38px 18px 16px 16px; background: linear-gradient(#ffffff 0 48%, #f4f8ff 49% 100%); border: 3px solid rgba(255,255,255,.95); box-shadow: inset 0 -18px 0 #e31b37, inset 0 -24px 0 #0f62b7, 0 14px 28px rgba(7, 21, 45, .26); }
+    .ticket-promo-banner i:before { content: ""; position: absolute; left: 54px; top: 13px; width: 142px; height: 30px; border-radius: 16px 9px 9px 16px; background: repeating-linear-gradient(90deg, #dcecff 0 38px, #ffffff 38px 42px); box-shadow: -42px 0 0 #dcecff, 152px 8px 0 -7px #dcecff, -90px 64px 0 -12px rgba(255,255,255,.78), -44px 64px 0 -12px rgba(255,255,255,.78), 2px 64px 0 -12px rgba(255,255,255,.78), 48px 64px 0 -12px rgba(255,255,255,.78), 94px 64px 0 -12px rgba(255,255,255,.78), 140px 64px 0 -12px rgba(255,255,255,.78), 186px 64px 0 -12px rgba(255,255,255,.78); }
+    .ticket-promo-banner i:after { content: ""; position: absolute; left: 34px; right: 34px; bottom: -12px; height: 24px; background: radial-gradient(circle at 8px 12px, #111827 0 11px, transparent 12px), radial-gradient(circle at calc(100% - 8px) 12px, #111827 0 11px, transparent 12px), radial-gradient(circle at 8px 12px, #cbd5e1 0 5px, transparent 6px), radial-gradient(circle at calc(100% - 8px) 12px, #cbd5e1 0 5px, transparent 6px); }
+    .operator-brand-row { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 24px; border-bottom: 1px solid #edf0f5; }
+    .brand-logo { display: block; height: 42px; width: auto; max-width: 180px; object-fit: contain; }
+    .operator-brand-row span { color: #687386; font-size: 12px; font-weight: 750; text-align: right; }
+    .ticket-title-row, .ticket-operator-row { display: grid; grid-template-columns: 1fr auto; gap: 18px; padding: 14px 24px; border-bottom: 1px solid #edf0f5; }
+    .ticket-title-row h2, .ticket-title-row p, .ticket-operator-row h3, .ticket-operator-row p { margin: 0; }
+    .ticket-title-row h2 { font-size: 20px; }
+    .ticket-title-row p, .ticket-operator-row p, .ticket-operator-row small { color: #4b5567; }
+    .ticket-title-row > div:last-child, .ticket-operator-row > div:last-child { text-align: right; display: grid; gap: 2px; }
+    .ticket-title-row span { display: block; }
+    .ticket-operator-row h3 { font-size: 20px; }
+    .ticket-trip-row { display: grid; grid-template-columns: 1fr 1.5fr 32px 1fr 1.5fr; gap: 14px; align-items: center; padding: 16px 24px; border-bottom: 1px solid #edf0f5; }
+    .ticket-trip-row span { display: block; color: #687386; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .ticket-trip-row h3, .ticket-trip-row p { margin: 2px 0; }
+    .ticket-trip-row h3 { font-size: 19px; }
+    .ticket-trip-row > strong { color: #b91c1c; font-size: 22px; text-align: center; }
+    .ticket-two-column, .ticket-footer-grid { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #edf0f5; }
+    .ticket-two-column > section, .ticket-footer-grid > section { padding: 16px 24px; }
+    .ticket-two-column > section:first-child, .ticket-footer-grid > section:first-child { border-right: 1px solid #edf0f5; }
+    h3 { margin: 0 0 12px; font-size: 15px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th { color: #111827; text-align: left; font-size: 11px; padding: 6px 7px; border-bottom: 1px solid #dfe5ef; }
+    td { padding: 7px; border-bottom: 1px solid #edf0f5; color: #111827; word-break: break-word; }
+    tr:last-child td { border-bottom: 0; }
+    .ticket-payment-list { display: grid; gap: 7px; margin: 0; }
+    .ticket-payment-list div { display: flex; justify-content: space-between; gap: 12px; color: #4b5567; }
+    .ticket-payment-list dt, .ticket-payment-list dd { margin: 0; }
+    .ticket-payment-list dd { color: #111827; font-weight: 850; text-align: right; word-break: break-word; }
+    .ticket-payment-list .amount-paid { padding-top: 8px; border-top: 1px solid #dfe5ef; color: #111827; font-weight: 900; }
+    .ticket-payment-list .amount-paid dd { color: #e31b37; font-size: 16px; }
+    .ticket-info-block { padding: 14px 24px; border-bottom: 1px solid #edf0f5; }
+    .ticket-info-block ul, .ticket-footer-grid ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; color: #374151; }
+    .ticket-footer-grid table th, .ticket-footer-grid table td { font-size: 11px; padding: 6px; }
+    .ticket-copyright { padding: 14px 24px 18px; color: #4b5567; text-align: center; font-size: 11px; font-weight: 800; }
+  </style>
+</head>
+<body>
+  <article class="operator-ticket">
+    <div class="ticket-print-meta"><span>09 Jul 2026, 09:30</span><b>Ticket - Orbita Travels</b><span>1/1</span></div>
+    <div class="ticket-promo-banner"><div><strong>ORBITA TRAVELS</strong><span>Confirmed journey ticket</span></div><i aria-hidden="true"></i></div>
+    <div class="operator-brand-row"><img class="brand-logo" src="src/assets/images/logo.png" alt="Orbita Travels logo" /><span>Support: Help and Support inside Orbita account</span></div>
+    <div class="ticket-title-row">
+      <div><h2>Orbita Ticket</h2><p>Booked on 09 Jul 2026, 09:30</p></div>
+      <div><span>Booking ID: <b>TT-BUS-LQ9K2M</b></span><span>Bus Partner PNR: <b>BDSD-78451290</b></span></div>
+    </div>
+    <div class="ticket-operator-row">
+      <div><h3>Orange Tours And Travels</h3><p>2 passenger(s) - AC Sleeper, LED NEW</p><small>Bus start time: 21:00</small></div>
+      <div><h3>Service # OTT-71</h3><p>Orange Tours And Travels</p><small>Payment: paid - Status: confirmed</small></div>
+    </div>
+    <div class="ticket-trip-row">
+      <div><span>Departure</span><h3>Hyderabad</h3><p>10 Jul 2026</p><b>21:00</b></div>
+      <div><span>Boarding Point:</span><p>Miyapur - Near KS Bakers Beside Samsung Plaza</p></div>
+      <strong>-&gt;</strong>
+      <div><span>Arrival</span><h3>Bangalore</h3><b>07:40</b></div>
+      <div><span>Dropping Point:</span><p>Hebbal - Opp Sanjay Honda</p></div>
+    </div>
+    <div class="ticket-two-column">
+      <section>
+        <h3>Passenger Details</h3>
+        <table><thead><tr><th>Name</th><th>Gender</th><th>Age</th><th>Seat No</th></tr></thead><tbody><tr><td>Customer</td><td>Male</td><td>31</td><td>L1</td></tr><tr><td>Passenger 2</td><td>Female</td><td>28</td><td>L2</td></tr></tbody></table>
+      </section>
+      <section>
+        <h3>Payment Details</h3>
+        <dl class="ticket-payment-list">
+          <div><dt>Total fare</dt><dd>&#8377;1,796</dd></div>
+          <div><dt>Payment provider</dt><dd>Razorpay</dd></div>
+          <div><dt>Payment ID</dt><dd>pay_live_sample</dd></div>
+          <div class="amount-paid"><dt>Amount Paid</dt><dd>&#8377;1,796</dd></div>
+        </dl>
+      </section>
+    </div>
+    <section class="ticket-info-block">
+      <h3>Important information</h3>
+      <ul><li>Please reach the boarding point before the reporting time shared by the operator.</li><li>Carry Aadhaar card or any valid government identity card while boarding.</li><li>For operator or refund issues, raise a request from Help and Support with this booking ID.</li></ul>
+    </section>
+    <div class="ticket-footer-grid">
+      <section>
+        <h3>Terms and Conditions</h3>
+        <ul><li>Departure and arrival times are tentative and may vary due to traffic, weather or operational changes.</li><li>Passengers should reach the selected boarding point at least 15 minutes before scheduled departure.</li><li>Orbita is not responsible for personal belongings left inside the vehicle.</li><li>Cancellation charges are applied as per operator policy and original payment method timelines.</li></ul>
+      </section>
+      <section>
+        <h3>Cancellation Policy</h3>
+        <table><thead><tr><th>Cancellation Time</th><th>Refund</th><th>Refund Amount</th></tr></thead><tbody><tr><td>Before 24 hours</td><td>90%</td><td>&#8377;1,616</td></tr><tr><td>12 - 24 hours</td><td>75%</td><td>&#8377;1,347</td></tr><tr><td>6 - 12 hours</td><td>50%</td><td>&#8377;898</td></tr><tr><td>After cancellation</td><td>-</td><td>-</td></tr></tbody></table>
+      </section>
+    </div>
+    <div class="ticket-copyright">Copyright Orbita Travels. All rights reserved.</div>
+  </article>
+</body>
+</html>

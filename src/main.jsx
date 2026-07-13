@@ -38,15 +38,48 @@ const defaultQuery = {
   returnDate: toDateInputValue(daysFromNow(4)),
   travellers: 1
 };
+const priorityCityNames = ["hyderabad", "bengaluru", "bangalore", "chennai", "mumbai", "delhi", "new delhi", "pune", "kolkata"];
+const cityStateBoardKeys = {
+  hyderabad: ["tgsrtc"],
+  secunderabad: ["tgsrtc"],
+  bangalore: ["ksrtc"],
+  bengaluru: ["ksrtc"],
+  mysore: ["ksrtc"],
+  mysuru: ["ksrtc"],
+  mangalore: ["ksrtc"],
+  vijayawada: ["apsrtc"],
+  visakhapatnam: ["apsrtc"],
+  vizag: ["apsrtc"],
+  tirupati: ["apsrtc"],
+  nellore: ["apsrtc"],
+  chennai: [],
+  mumbai: [],
+  delhi: [],
+  "new delhi": []
+};
 const operatorBrands = [
-  { key: "apsrtc", match: "apsrtc", title: "APSRTC", logo: apsrtcLogo, subtitle: "Andhra Pradesh state services" },
-  { key: "tgsrtc", match: "tgsrtc", title: "TGSRTC", logo: tgsrtcLogo, subtitle: "Telangana state services" },
-  { key: "ksrtc", match: "ksrtc", title: "KSRTC", logo: ksrtcLogo, subtitle: "Karnataka state services" }
+  { key: "apsrtc", match: "apsrtc", aliases: ["apsrtc", "andhra pradesh state road transport", "andhra pradesh rtc"], title: "APSRTC", logo: apsrtcLogo, subtitle: "Andhra Pradesh state services" },
+  { key: "tgsrtc", match: "tgsrtc", aliases: ["tgsrtc", "tsrtc", "telangana state road transport", "telangana rtc"], title: "TGSRTC", logo: tgsrtcLogo, subtitle: "Telangana state services" },
+  { key: "ksrtc", match: "ksrtc", aliases: ["ksrtc", "karnataka state road transport", "karnataka rtc"], title: "KSRTC", logo: ksrtcLogo, subtitle: "Karnataka state services" }
 ];
 
 function operatorBrand(routeOrName) {
-  const value = typeof routeOrName === "string" ? routeOrName : routeOrName?.providerName || "";
-  return operatorBrands.find((brand) => value.toLowerCase().includes(brand.match));
+  const value = typeof routeOrName === "string" ? routeOrName : `${routeOrName?.providerName || ""} ${routeOrName?.operatorName || ""} ${routeOrName?.travelsName || ""}`;
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const compact = normalized.replace(/\s+/g, "");
+  return operatorBrands.find((brand) => brand.aliases.some((alias) => normalized.includes(alias) || compact.includes(alias.replace(/[^a-z0-9]+/g, ""))));
+}
+
+function routeRelevantStateBoardKeys(query, routes = []) {
+  const keys = new Set();
+  [query?.from, query?.to].forEach((city) => {
+    cityStateBoardKeys[String(city || "").toLowerCase()]?.forEach((key) => keys.add(key));
+  });
+  routes.forEach((route) => {
+    const brand = operatorBrand(route);
+    if (brand) keys.add(brand.key);
+  });
+  return keys;
 }
 
 const cancellationPolicyRows = [
@@ -96,6 +129,47 @@ function sentenceCaseCity(value) {
     .replace(/\b([a-z])/g, (match) => match.toUpperCase());
 }
 
+function normalizedDisplayKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b(boarding|dropping|pickup|pick up|drop|dropoff|drop off|point|bus stand|bus station|bus stop|terminal|travels|near|opp|opposite|beside|main|central)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function uniqueDisplayNames(values) {
+  const seen = new Set();
+  const result = [];
+  values.filter(Boolean).forEach((value) => {
+    const label = String(value).trim();
+    const key = normalizedDisplayKey(label) || label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(label);
+  });
+  return result;
+}
+
+function uniqueCitiesByDisplay(cities) {
+  const seen = new Set();
+  const result = [];
+  cities.forEach((city) => {
+    const name = String(city?.name || "").trim();
+    const key = normalizedDisplayKey(name) || name.toLowerCase();
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    result.push(city);
+  });
+  return result;
+}
+
+function cityPriorityScore(value) {
+  const normalized = String(value || "").toLowerCase();
+  const index = priorityCityNames.indexOf(normalized);
+  return index >= 0 ? index : priorityCityNames.length + 100;
+}
+
 function CityDropdown({ value, placeholder, cities, onChange }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -140,19 +214,20 @@ function CityDropdown({ value, placeholder, cities, onChange }) {
       const normalizedName = normalizeSearch(name);
       const words = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
       const initials = words.map((word) => word[0]).join("");
-      let score = index + 1000;
-      if (!searchTerm) score = index;
+      const priorityScore = cityPriorityScore(name);
+      let score = priorityScore * 1000 + index;
+      if (!searchTerm) score = priorityScore * 1000 + index;
       else if (normalizedName === searchTerm) score = -100;
       else if (normalizedName.startsWith(searchTerm)) score = -90;
       else if (words.some((word) => normalizeSearch(word).startsWith(searchTerm))) score = -80;
       else if (initials.startsWith(searchTerm)) score = -70;
       else if (normalizedName.includes(searchTerm)) score = -60;
       else score = Infinity;
-      return { city, score };
+      return { city, score: score + priorityScore };
     })
     .filter(({ score }) => Number.isFinite(score))
     .sort((a, b) => a.score - b.score || String(a.city.name).localeCompare(String(b.city.name)));
-  const visibleCities = scoredCities.slice(0, 80).map(({ city }) => city);
+  const visibleCities = uniqueCitiesByDisplay(scoredCities.map(({ city }) => city)).slice(0, 80);
 
   const selectCity = (cityName) => {
     setQuery("");
@@ -268,6 +343,7 @@ function App() {
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [activeJourney, setActiveJourney] = useState(null);
   const [bookingResumeState, setBookingResumeState] = useState(null);
+  const [searchSnapshots, setSearchSnapshots] = useState({});
   const [authReturnPage, setAuthReturnPage] = useState(null);
   const [authMessage, setAuthMessage] = useState("");
 
@@ -328,9 +404,9 @@ function App() {
   return (
     <main>
       {!immersiveBooking && <TopNav page={page} setPage={setPage} user={user} setUser={setUser} />}
-      {page === "bus" && <HomePage cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} packages={packages} pendingRoute={pendingRoute} setPendingRoute={setPendingRoute} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />}
-      {page === "flight" && <ServicePage type="flight" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />}
-      {page === "train" && <ServicePage type="train" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />}
+      {page === "bus" && <HomePage cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} packages={packages} pendingRoute={pendingRoute} setPendingRoute={setPendingRoute} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} searchSnapshots={searchSnapshots} setSearchSnapshots={setSearchSnapshots} />}
+      {page === "flight" && <ServicePage type="flight" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} searchSnapshots={searchSnapshots} setSearchSnapshots={setSearchSnapshots} />}
+      {page === "train" && <ServicePage type="train" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} searchSnapshots={searchSnapshots} setSearchSnapshots={setSearchSnapshots} />}
       {page === "hotels" && <HotelsPage hotels={hotels} setPage={setPage} setPendingCheckout={setPendingCheckout} />}
       {page === "packages" && <PackagesPage packages={packages} user={user} refreshBookings={refreshBookings} />}
       {page === "dashboard" && <DashboardPage user={user} setUser={setUser} setPage={setPage} bookings={bookings} refreshBookings={refreshBookings} />}
@@ -394,7 +470,7 @@ function HomePage(props) {
   );
 }
 
-function BusHero({ cities, user, setUser, setPage, refreshBookings, pendingRoute, setPendingRoute, setPendingCheckout, setActiveJourney }) {
+function BusHero({ cities, user, setUser, setPage, refreshBookings, pendingRoute, setPendingRoute, setPendingCheckout, setActiveJourney, searchSnapshots, setSearchSnapshots }) {
   return (
     <section className="bus-hero">
       <div className="hero-art">
@@ -405,12 +481,12 @@ function BusHero({ cities, user, setUser, setPage, refreshBookings, pendingRoute
           <p>Compare trusted operators, choose seats, manage trips and get help before, during and after your journey.</p>
         </div>
       </div>
-      <JourneySearch type="bus" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} pendingRoute={pendingRoute} setPendingRoute={setPendingRoute} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} compactHero />
+      <JourneySearch type="bus" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} pendingRoute={pendingRoute} setPendingRoute={setPendingRoute} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} searchSnapshots={searchSnapshots} setSearchSnapshots={setSearchSnapshots} compactHero />
     </section>
   );
 }
 
-function ServicePage({ type, cities, user, setUser, setPage, refreshBookings, setPendingCheckout, setActiveJourney }) {
+function ServicePage({ type, cities, user, setUser, setPage, refreshBookings, setPendingCheckout, setActiveJourney, searchSnapshots, setSearchSnapshots }) {
   const pageCopy = {
     flight: {
       title: "Flights",
@@ -447,7 +523,7 @@ function ServicePage({ type, cities, user, setUser, setPage, refreshBookings, se
           <img src={details.image} alt={`${details.title} travel`} />
         </div>
       </div>
-      <JourneySearch type={type} cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} />
+      <JourneySearch type={type} cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} searchSnapshots={searchSnapshots} setSearchSnapshots={setSearchSnapshots} />
       <div className="service-story-grid">
         {details.stats.map(([value, label]) => <article key={label}><strong>{value}</strong><span>{label}</span></article>)}
       </div>
@@ -465,17 +541,33 @@ function ServicePage({ type, cities, user, setUser, setPage, refreshBookings, se
   );
 }
 
-function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, compactHero, setPendingCheckout, setActiveJourney }) {
-  const [query, setQuery] = useState(defaultQuery);
-  const [results, setResults] = useState([]);
-  const [message, setMessage] = useState("");
+function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, compactHero, setPendingCheckout, setActiveJourney, searchSnapshots, setSearchSnapshots }) {
+  const savedSearch = searchSnapshots?.[type];
+  const [query, setQueryState] = useState(savedSearch?.query || defaultQuery);
+  const [results, setResultsState] = useState(savedSearch?.results || []);
+  const [message, setMessageState] = useState(savedSearch?.message || "");
   const [searching, setSearching] = useState(false);
   const resultsRef = useRef(null);
+  const setQuery = (nextQuery) => {
+    const value = typeof nextQuery === "function" ? nextQuery(query) : nextQuery;
+    setQueryState(value);
+    setSearchSnapshots?.((current) => ({ ...current, [type]: { ...(current[type] || {}), query: value } }));
+  };
+  const setResults = (nextResults) => {
+    const value = typeof nextResults === "function" ? nextResults(results) : nextResults;
+    setResultsState(value);
+    setSearchSnapshots?.((current) => ({ ...current, [type]: { ...(current[type] || {}), query, results: value } }));
+  };
+  const setMessage = (nextMessage) => {
+    const value = typeof nextMessage === "function" ? nextMessage(message) : nextMessage;
+    setMessageState(value);
+    setSearchSnapshots?.((current) => ({ ...current, [type]: { ...(current[type] || {}), query, message: value } }));
+  };
   const selectedCities = cities.filter((city) => {
     const inScope = query.scope === "international" ? city.isInternational : !city.isInternational;
     const supportsMode = city.transportModes?.includes(type);
     return inScope && supportsMode;
-  });
+  }).sort((a, b) => cityPriorityScore(a.name) - cityPriorityScore(b.name) || String(a.name).localeCompare(String(b.name)));
   const fromCities = selectedCities.filter((city) => city.name !== query.to);
   const toCities = selectedCities.filter((city) => city.name !== query.from);
   const canSearch = query.from && query.to && query.from !== query.to && query.date && (type === "flight" ? true : query.scope === "domestic");
@@ -492,7 +584,8 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
     try {
       const params = new URLSearchParams({ from: query.from, to: query.to, date: query.date, tripType: query.tripType });
       const data = await api(`/transport/${type}/search?${params}`);
-      setResults(data);
+      setResultsState(data);
+      setSearchSnapshots?.((current) => ({ ...current, [type]: { query, results: data, message: "" } }));
       if (!data.length && !silent) setMessage(`No ${type === "bus" ? "bus" : type} services returned for this route/date. Try another date or route.`);
       if (!silent) {
         window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
@@ -519,8 +612,10 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
     if (type !== "flight" && query.scope !== "domestic") {
       setQuery({ ...query, scope: "domestic", from: "", to: "" });
     }
-    setResults([]);
-    setMessage("");
+    if (!savedSearch?.results?.length) {
+      setResults([]);
+      setMessage("");
+    }
   }, [type, query.scope]);
 
   return (
@@ -661,10 +756,12 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
 
   const boardingPointOptions = livePoints?.boardingPoints?.length ? livePoints.boardingPoints : [];
   const droppingPointOptions = livePoints?.droppingPoints?.length ? livePoints.droppingPoints : [];
-  const boardingPoints = boardingPointOptions.map((point) => point.name);
-  const droppingPoints = droppingPointOptions.map((point) => point.name);
+  const boardingPoints = uniqueDisplayNames(boardingPointOptions.map((point) => point.name));
+  const droppingPoints = uniqueDisplayNames(droppingPointOptions.map((point) => point.name));
   const seats = isBus ? selectedSeats : [];
-  const total = Number(route.price) * Math.max(isBus ? seats.length : passengers.length, 1);
+  const total = isBus && seats.length
+    ? selectedSeatFareTotal(route, seats)
+    : Number(route.price) * Math.max(isBus ? seats.length : passengers.length, 1);
   const canContinue = step === "points" ? boardingPoint && dropPoint : step === "seats" ? selectedSeats.length > 0 : true;
 
   const goBack = () => {
@@ -699,6 +796,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
           {step === "points" ? <X size={26} /> : <ArrowLeft size={24} />}
         </button>
         <div className="booking-route-title"><b>{route.origin}</b><span>→</span><b>{route.destination}</b></div>
+        <button type="button" className="booking-results-back" onClick={() => setPage(route.type || "bus")}><ArrowLeft size={16} /> Back to results</button>
         <div className="window-offer">Last min. 10% OFF</div>
       </div>
       <div className="wizard-tabs booking-tabs">
@@ -749,33 +847,51 @@ function seatVisualType(seat, rawType) {
   const htmlClass = String(seat.htmlClass || seat.className || "").toLowerCase();
   const seatName = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.label || seat.id || "");
   if (seat.visualType) return seat.visualType;
+  const explicitlySeater = /(seat|chair|seater)/i.test(type) && !/(sleeper|berth)/i.test(type);
   if (/^[LU]\d+$/i.test(seatName) && !type && !htmlClass) return "berth";
-  if (/^[LU]\d+$/i.test(seatName) && !/(seat|chair|seater)/i.test(type)) return "berth";
+  if (/^[LU]\d+$/i.test(seatName) && !explicitlySeater) return "berth";
+  if (/^\d+(LA|LB|LC|UA|UB|UC)$/i.test(seatName) && !explicitlySeater) return "berth";
   if (type.includes("sleeper") || type.includes("berth") || htmlClass.includes("sleeper") || htmlClass.includes("berth")) return "berth";
   if (/\bb?hseat\b/.test(htmlClass) || type.includes("horizontal") || type === "2") return "horizontal-seat";
   return "seat";
 }
 
+function detectSeatDeck(seat) {
+  const label = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.label || seat.id || "").trim().toLowerCase();
+  const text = String(`${seat.Deck || seat.deck || ""} ${seat.ZIndex || seat.zIndex || ""} ${seat.DeckNo || ""} ${seat.deckIndex || ""}`).toLowerCase();
+  if (text.includes("upper") || label.startsWith("u")) return "upper";
+  if (text.includes("lower") || label.startsWith("l")) return "lower";
+  const z = numberFrom(seat.ZIndex, seat.zIndex, seat.deckIndex, seat.DeckIndex, seat.DeckNo);
+  return z === 1 ? "upper" : "lower";
+}
+
 function normalizeApiSeat(seat, index) {
-  const column = numberFrom(seat.ColumnNo, seat.ColumnNumber, seat.Column, seat.SeatColumn, seat.column, seat.X, seat.x, seat.ColumnIndex, seat.ColNo, seat.Col);
-  const row = numberFrom(seat.RowNo, seat.RowNumber, seat.Row, seat.SeatRow, seat.row, seat.Y, seat.y, seat.RowIndex, seat.RowId);
+  const column = numberFrom(seat.ColumnNo, seat.ColumnNumber, seat.Column, seat.SeatColumn, seat.column, seat.ColumnIndex, seat.ColNo, seat.Col, seat.X, seat.x);
+  const row = numberFrom(seat.RowNo, seat.RowNumber, seat.Row, seat.SeatRow, seat.row, seat.RowIndex, seat.RowId, seat.Y, seat.y);
   if (!Number.isFinite(column) || !Number.isFinite(row)) return null;
   const width = Math.max(1, numberFrom(seat.Width, seat.SeatWidth, seat.width, seat.w) || 1);
   const height = Math.max(1, numberFrom(seat.Height, seat.SeatHeight, seat.height, seat.h) || 1);
-  const deckText = String(seat.Deck || seat.deck || "").toLowerCase();
-  const deckNoText = String(seat.DeckNo || "").toLowerCase();
-  const isUpper = booleanFrom(seat.IsUpper, seat.Upper, seat.IsUpperDeck) || deckText.includes("upper") || deckNoText === "1";
   const id = String(seat.SeatName || seat.SeatNo || seat.SeatNumber || seat.id || seat.SeatIndex || index + 1);
+  const deck = booleanFrom(seat.IsUpper, seat.Upper, seat.IsUpperDeck) ? "upper" : detectSeatDeck(seat);
   const rawType = String(seat.SeatType || seat.Type || seat.BerthType || seat.rawType || "").toLowerCase();
-  const visualType = seatVisualType(seat, rawType);
-  const isBerth = Boolean(seat.isBerth || visualType === "berth");
+  const detectedVisualType = seatVisualType(seat, rawType);
+  const explicitIsBerth = booleanFrom(
+    seat.isBerth,
+    seat.IsBerth,
+    seat.is_berth,
+    seat.IsSleeper,
+    seat.isSleeper,
+    seat.IsSleeperSeat
+  );
+  const isBerth = deck === "upper" || explicitIsBerth || detectedVisualType === "berth";
+  const visualType = isBerth ? "berth" : detectedVisualType;
   const finalWidth = width;
   const finalHeight = isBerth && width === 1 && height === 1 ? 2 : height;
   return {
     ...seat,
     id,
     label: seat.SeatName || seat.label || id,
-    deck: isUpper ? "upper" : "lower",
+    deck,
     row,
     column,
     width: finalWidth,
@@ -784,6 +900,36 @@ function normalizeApiSeat(seat, index) {
     visualType,
     isWalkway: Boolean(seat.isWalkway || seat.IsWalkway)
   };
+}
+
+function seatFareAmount(seat, fallbackFare = 0) {
+  const candidates = [
+    seat?.SeatFare,
+    seat?.Price?.OfferedPrice,
+    seat?.Price?.PublishedPrice,
+    seat?.Price?.BasePrice,
+    seat?.Price?.Price,
+    seat?.fare,
+    seat?.Fare,
+    seat?.OfferedFare,
+    seat?.PublishedFare
+  ];
+  for (const value of candidates) {
+    const amount = Number(value);
+    if (Number.isFinite(amount) && amount > 0) return amount;
+  }
+  return Number(fallbackFare) || 0;
+}
+
+function selectedSeatFareTotal(route, selectedSeatIds) {
+  const seatIds = new Set(selectedSeatIds || []);
+  if (!seatIds.size) return 0;
+  const normalizedSeats = extractSeatList(route?.seatLayout).map(normalizeApiSeat).filter(Boolean);
+  const byId = new Map(normalizedSeats.map((seat) => [seat.id, seat]));
+  return [...seatIds].reduce((sum, seatId) => {
+    const seat = byId.get(seatId);
+    return sum + seatFareAmount(seat, route?.price);
+  }, 0);
 }
 
 function seatIntervals(seats) {
@@ -912,16 +1058,252 @@ function suffixSlot(suffix, suffixes) {
   return null;
 }
 
+function isSingleSideBerthSuffix(suffix) {
+  return ["L", "S", "SL", "SU"].includes(suffix);
+}
+
+function buildSuffixLaneLayout(parsed, laneRows, options = {}) {
+  const groupKeys = [...new Set(parsed.map((item) => item.parts.number))].sort((a, b) => a - b);
+  const columnByNumber = new Map(groupKeys.map((number, index) => [number, (index * (options.groupSpan || 2)) + 1]));
+  const columns = Math.max(1, groupKeys.length * (options.groupSpan || 2));
+  const suffixes = Object.keys(laneRows).filter((suffix) => suffix !== "DEFAULT");
+  const existingLabels = new Set(parsed.map((item) => item.parts.label));
+  const toLayoutSeat = ({ seat, parts, virtual = false }) => {
+    const lane = laneRows[parts.suffix] || laneRows.DEFAULT || { row: 1, width: 1, visualType: "seat" };
+    const isBerth = lane.visualType === "berth" || Boolean(lane.isBerth);
+    const baseColumn = columnByNumber.get(parts.number) || 1;
+    return {
+      ...seat,
+      id: seat.id || parts.label,
+      label: seat.label || parts.label,
+      row: lane.row,
+      column: baseColumn + (lane.offset || 0),
+      width: lane.width || (isBerth ? 2 : 1),
+      height: 1,
+      isBerth,
+      visualType: isBerth ? "berth" : "seat",
+      isUnavailable: Boolean(seat.isUnavailable || virtual),
+      isVirtualSeat: virtual
+    };
+  };
+  const orderedSeats = parsed.map((item) => toLayoutSeat(item));
+  if (options.fillMissing) {
+    groupKeys.forEach((number) => {
+      suffixes.forEach((suffix) => {
+        const label = `${number}${suffix}`;
+        if (existingLabels.has(label)) return;
+        orderedSeats.push(toLayoutSeat({
+          virtual: true,
+          seat: { id: label, label, SeatName: label },
+          parts: { number, suffix, label }
+        }));
+      });
+    });
+  }
+  const gridGap = columns > 14 ? 6 : 8;
+  const targetWidth = options.targetWidth || (columns > 14 ? 760 : 680);
+  const seatTrack = Math.max(options.minTrack || 24, Math.min(options.maxTrack || 42, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
+  const rows = Math.max(...Object.values(laneRows).map((lane) => lane.row || 1), options.aisleRow || 1);
+  const rowTracks = Array.from({ length: rows }, (_, index) => index + 1 === options.aisleRow ? `${options.aisleTrack || 30}px` : `${seatTrack}px`).join(" ");
+  return {
+    seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
+    rows,
+    columns,
+    columnTracks: Array.from({ length: columns }, () => `${seatTrack}px`).join(" "),
+    rowTracks,
+    aisleRow: options.aisleRow,
+    gridGap: `${gridGap}px ${gridGap}px`,
+    rotated: false,
+    orderedByLabel: true
+  };
+}
+
+function laneFromApi(parsed, suffix, row) {
+  const laneSeats = parsed.filter((item) => item.parts.suffix === suffix);
+  const berthLike = laneSeats.some((item) => item.seat.isBerth || item.seat.visualType === "berth" || (item.seat.width || 1) > 1 || (item.seat.height || 1) > 1);
+  return { row, width: berthLike ? 2 : 1, visualType: berthLike ? "berth" : "seat" };
+}
+
+function buildNumericOnlyLayout(parsed) {
+  const ordered = [...parsed].sort((a, b) => a.parts.number - b.parts.number);
+  const hasBerths = ordered.some((item) => item.seat.isBerth || item.seat.visualType === "berth");
+  const groupSize = hasBerths ? 3 : 4;
+  const groupCount = Math.ceil(ordered.length / groupSize);
+  const columns = Math.max(1, groupCount * (hasBerths ? 2 : 2));
+  const orderedSeats = ordered.map(({ seat, parts }, index) => {
+    const groupIndex = Math.floor(index / groupSize);
+    const remainder = index % groupSize;
+    const row = hasBerths
+      ? (remainder === 0 ? 1 : remainder === 1 ? 2 : 4)
+      : (remainder === 0 ? 1 : remainder === 1 ? 2 : remainder === 2 ? 4 : 5);
+    const column = (groupIndex * 2) + (hasBerths || remainder < 2 ? 1 : 2);
+    return {
+      ...seat,
+      row,
+      column,
+      width: hasBerths ? 2 : 1,
+      height: 1,
+      isBerth: hasBerths,
+      visualType: hasBerths ? "berth" : "seat"
+    };
+  });
+  const gridGap = columns > 14 ? 6 : 8;
+  const targetWidth = columns > 14 ? 760 : 650;
+  const seatTrack = Math.max(columns > 14 ? 20 : 24, Math.min(hasBerths ? 38 : 34, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
+  const rows = hasBerths ? 4 : 5;
+  const rowTracks = hasBerths
+    ? `${seatTrack}px ${seatTrack}px 28px ${seatTrack}px`
+    : `${seatTrack}px ${seatTrack}px 28px ${seatTrack}px ${seatTrack}px`;
+  return {
+    seats: orderedSeats,
+    rows,
+    columns,
+    columnTracks: Array.from({ length: columns }, () => `${seatTrack}px`).join(" "),
+    rowTracks,
+    aisleRow: 3,
+    gridGap: `${gridGap}px ${gridGap}px`,
+    rotated: false,
+    orderedByLabel: true
+  };
+}
+
+function buildCompactDeckSeriesLayout(parsed, suffixSet) {
+  const numericSeats = parsed
+    .filter((item) => item.parts.suffix === "N")
+    .sort((a, b) => a.parts.number - b.parts.number);
+  const deckSeries = parsed
+    .filter((item) => item.parts.suffix !== "N")
+    .sort((a, b) => a.parts.number - b.parts.number);
+  const isLowerMixedSeries = numericSeats.length > 0 && deckSeries.length > 0 &&
+    [...suffixSet].every((suffix) => ["N", "LD"].includes(suffix));
+  const isSingleDeckSeries = numericSeats.length === 0 && suffixSet.size === 1 &&
+    ["LD", "UD"].includes(deckSeries[0]?.parts.suffix);
+
+  if (!isLowerMixedSeries && !isSingleDeckSeries) return null;
+
+  if (isLowerMixedSeries) {
+    const seats = [
+      ...numericSeats.map(({ seat }, index) => ({
+        ...seat,
+        row: (index % 2) + 1,
+        column: Math.floor(index / 2) + 1,
+        width: 1,
+        height: 1
+      })),
+      ...deckSeries.map(({ seat }, index) => ({
+        ...seat,
+        row: 4,
+        column: seat.isBerth ? (index * 2) + 1 : index + 1,
+        width: seat.isBerth ? 2 : 1,
+        height: 1
+      }))
+    ];
+    return {
+      seats,
+      rows: 4,
+      columns: Math.max(
+        Math.ceil(numericSeats.length / 2),
+        deckSeries.reduce((width, { seat }) => width + (seat.isBerth ? 2 : 1), 0)
+      ),
+      aisleRow: 3,
+      rotated: false,
+      orderedByLabel: true,
+      labelPattern: "number-with-lower-deck-series"
+    };
+  }
+
+  const seatsPerSide = Math.ceil(deckSeries.length / 2);
+  const allUpperBerths = deckSeries.every(({ seat }) => seat.isBerth);
+  if (allUpperBerths) {
+    const berthRows = [1, 2, 4];
+    return {
+      seats: deckSeries.map(({ seat }, index) => ({
+        ...seat,
+        row: berthRows[index % berthRows.length],
+        column: (Math.floor(index / berthRows.length) * 2) + 1,
+        width: 2,
+        height: 1,
+        isBerth: true,
+        visualType: "berth"
+      })),
+      rows: 4,
+      columns: Math.ceil(deckSeries.length / berthRows.length) * 2,
+      aisleRow: 3,
+      rotated: false,
+      orderedByLabel: true,
+      labelPattern: "upper-2-plus-1-sleeper"
+    };
+  }
+  const topSeries = deckSeries.slice(0, seatsPerSide);
+  const bottomSeries = deckSeries.slice(seatsPerSide);
+  const seriesColumn = (series, index) => series
+    .slice(0, index)
+    .reduce((column, { seat }) => column + (seat.isBerth ? 2 : 1), 1);
+  return {
+    seats: deckSeries.map(({ seat }, index) => {
+      const top = index < seatsPerSide;
+      const series = top ? topSeries : bottomSeries;
+      const seriesIndex = top ? index : index - seatsPerSide;
+      return {
+      ...seat,
+      row: top ? 1 : 4,
+      column: seriesColumn(series, seriesIndex),
+      width: seat.isBerth ? 2 : 1,
+      height: 1
+    }; }),
+    rows: 4,
+    columns: Math.max(
+      topSeries.reduce((width, { seat }) => width + (seat.isBerth ? 2 : 1), 0),
+      bottomSeries.reduce((width, { seat }) => width + (seat.isBerth ? 2 : 1), 0)
+    ),
+    aisleRow: 3,
+    rotated: false,
+    orderedByLabel: true,
+    labelPattern: "deck-series"
+  };
+}
+
 function buildLabelOrderedDeckLayout(seats) {
   const parsed = seats.map((seat) => ({ seat, parts: seatLabelParts(seat) })).filter((item) => item.parts);
   if (parsed.length < Math.max(4, Math.ceil(seats.length * 0.7))) return null;
 
   const suffixList = [...new Set(parsed.map((item) => item.parts.suffix))];
+  const suffixSet = new Set(suffixList);
+  const compactDeckSeries = buildCompactDeckSeriesLayout(parsed, suffixSet);
+  if (compactDeckSeries) return compactDeckSeries;
+  if (suffixList.length === 1 && suffixSet.has("N")) {
+    return buildNumericOnlyLayout(parsed);
+  }
+  if (["E", "G", "D", "F"].every((suffix) => suffixSet.has(suffix)) && ["LA", "LB", "LC"].some((suffix) => suffixSet.has(suffix))) {
+    return buildSuffixLaneLayout(parsed, {
+      E: { row: 1, offset: 0, width: 1, visualType: "seat" },
+      G: { row: 1, offset: 1, width: 1, visualType: "seat" },
+      D: { row: 2, offset: 0, width: 1, visualType: "seat" },
+      F: { row: 2, offset: 1, width: 1, visualType: "seat" },
+      LA: laneFromApi(parsed, "LA", 4),
+      LB: laneFromApi(parsed, "LB", 4),
+      LC: laneFromApi(parsed, "LC", 4)
+    }, { aisleRow: 3, groupSpan: 2, minTrack: 22, maxTrack: 34, targetWidth: 650, aisleTrack: 28, fillMissing: false });
+  }
+  if (["LA", "LB", "LC"].every((suffix) => suffixSet.has(suffix))) {
+    return buildSuffixLaneLayout(parsed, {
+      LA: laneFromApi(parsed, "LA", 1),
+      LB: laneFromApi(parsed, "LB", 2),
+      LC: laneFromApi(parsed, "LC", 4)
+    }, { aisleRow: 3, groupSpan: 2, minTrack: 22, maxTrack: 34, targetWidth: 650, aisleTrack: 28, fillMissing: true });
+  }
+  if (suffixSet.has("UC") && suffixSet.has("UB")) {
+    return buildSuffixLaneLayout(parsed, {
+      UC: laneFromApi(parsed, "UC", 1),
+      UB: laneFromApi(parsed, "UB", 2),
+      UA: laneFromApi(parsed, "UA", 4)
+    }, { aisleRow: 3, groupSpan: 2, minTrack: 22, maxTrack: 34, targetWidth: 650, aisleTrack: 28, fillMissing: suffixSet.has("UA") });
+  }
   const hasOnlyUpperSeries = suffixList.length === 1 && suffixList[0] === "U";
   const hasUpperBerthSeries = suffixList.some((suffix) => ["U", "SU", "UA", "UB", "UC"].includes(suffix)) && suffixList.every((suffix) => ["U", "SU", "UA", "UB", "UC"].includes(suffix));
   if (!hasOnlyUpperSeries && hasUpperBerthSeries) {
     const upperRows = [...new Set(parsed.map((item) => item.seat.row))].sort((a, b) => a - b);
-    const upperRowMap = new Map(upperRows.map((row, index) => [row, index === 0 ? 1 : 3]));
+    const upperRowMap = new Map(upperRows.map((row, index) => [row, index === 0 ? 1 : index === 1 ? 2 : 4]));
     const upperColumns = [...new Set(parsed.map((item) => item.seat.column))].sort((a, b) => a - b);
     const upperColumnMap = new Map(upperColumns.map((column, index) => [column, (index * 2) + 1]));
     const columns = Math.max(2, upperColumns.length * 2);
@@ -934,51 +1316,85 @@ function buildLabelOrderedDeckLayout(seats) {
       isBerth: true,
       visualType: "berth"
     }));
+    const maxNumber = Math.max(...parsed.map((item) => item.parts.number).filter(Number.isFinite), 0);
+    upperColumns.forEach((column, index) => {
+      const label = `U${maxNumber + index + 1}`;
+      orderedSeats.push({
+        id: label,
+        label,
+        SeatName: label,
+        row: 4,
+        column: upperColumnMap.get(column) || (index * 2) + 1,
+        width: 2,
+        height: 1,
+        isBerth: true,
+        visualType: "berth",
+        isUnavailable: true,
+        isVirtualSeat: true
+      });
+    });
     const gridGap = 7;
     const targetWidth = 720;
     const compactSeatTrack = Math.max(18, Math.min(34, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
     return {
       seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
-      rows: 3,
+      rows: 4,
       columns,
       columnTracks: Array.from({ length: columns }, () => `${compactSeatTrack}px`).join(" "),
-      rowTracks: `${compactSeatTrack}px 32px ${compactSeatTrack}px`,
-      aisleRow: 2,
+      rowTracks: `${compactSeatTrack}px ${compactSeatTrack}px 32px ${compactSeatTrack}px`,
+      aisleRow: 3,
       rotated: false,
-      orderedByLabel: true
+      orderedByLabel: true,
+      labelPattern: "upper-u-pair"
     };
   }
   if (hasOnlyUpperSeries) {
-    const maxNumber = Math.max(...parsed.map((item) => item.parts.number));
-    const groupCount = Math.ceil(maxNumber / 3);
+    const orderedNumbers = [...new Set(parsed.map((item) => item.parts.number))].sort((a, b) => a - b);
+    const groupCount = Math.ceil(orderedNumbers.length / 2);
     const columns = groupCount * 2;
+    const numberToPair = new Map(orderedNumbers.map((number, index) => [number, Math.floor(index / 2)]));
+    const maxNumber = Math.max(...orderedNumbers);
     const orderedSeats = parsed.map(({ seat, parts }) => {
-      const sequence = Math.max(0, parts.number - 1);
-      const remainder = sequence % 3;
-      const groupIndex = Math.floor(sequence / 3);
-      const isTopBerth = remainder === 2;
+      const pairIndex = numberToPair.get(parts.number) || 0;
       return {
         ...seat,
-        row: isTopBerth ? 1 : remainder === 0 ? 3 : 4,
-        column: (groupIndex * 2) + 1,
-        width: isTopBerth || seat.isBerth ? 2 : 1,
+        row: parts.number % 2 === 0 ? 1 : 2,
+        column: (pairIndex * 2) + 1,
+        width: 2,
         height: 1,
-        isBerth: Boolean(isTopBerth || seat.isBerth),
-        visualType: isTopBerth || seat.isBerth ? "berth" : "seat"
+        isBerth: true,
+        visualType: "berth"
       };
     });
+    for (let index = 0; index < groupCount; index += 1) {
+      const label = `U${maxNumber + index + 1}`;
+      orderedSeats.push({
+        id: label,
+        label,
+        SeatName: label,
+        row: 4,
+        column: (index * 2) + 1,
+        width: 2,
+        height: 1,
+        isBerth: true,
+        visualType: "berth",
+        isUnavailable: true,
+        isVirtualSeat: true
+      });
+    }
     const gridGap = 8;
-    const targetWidth = 620;
+    const targetWidth = 680;
     const compactSeatTrack = Math.max(32, Math.min(46, Math.floor((targetWidth - Math.max(0, columns - 1) * gridGap) / Math.max(columns, 1))));
     return {
       seats: orderedSeats.sort((a, b) => a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id))),
       rows: 4,
       columns,
       columnTracks: Array.from({ length: columns }, () => `${compactSeatTrack}px`).join(" "),
-      rowTracks: `${compactSeatTrack}px 34px ${compactSeatTrack}px ${compactSeatTrack}px`,
-      aisleRow: 2,
+      rowTracks: `${compactSeatTrack}px ${compactSeatTrack}px 34px ${compactSeatTrack}px`,
+      aisleRow: 3,
       rotated: false,
-      orderedByLabel: true
+      orderedByLabel: true,
+      labelPattern: "upper-u-pair"
     };
   }
 
@@ -986,19 +1402,20 @@ function buildLabelOrderedDeckLayout(seats) {
   const slotMap = new Map(suffixes.map((suffix, index) => [suffix, suffixSlot(suffix, suffixes) || { row: index + 1, subColumn: 1 }]));
   const numbers = [...new Set(parsed.map((item) => item.parts.number))].sort((a, b) => a - b);
   const groupWidth = Math.max(...[...slotMap.values()].map((slot) => slot.subColumn || 1));
-  const hasBdsdLowerSeries = suffixes.some((suffix) => ["B", "A", "L"].includes(suffix)) || (suffixes.includes("N") && suffixes.includes("L"));
+  const hasSingleSideBerths = suffixes.some(isSingleSideBerthSuffix);
+  const hasBdsdLowerSeries = suffixes.some((suffix) => ["B", "A", "L"].includes(suffix)) || (suffixes.includes("N") && hasSingleSideBerths) || (suffixes.includes("R") && hasSingleSideBerths);
   if (hasBdsdLowerSeries) {
-    const topRows = [...new Set(parsed.filter((item) => item.parts.suffix !== "L").map((item) => item.seat.row))].sort((a, b) => a - b);
+    const topRows = [...new Set(parsed.filter((item) => !isSingleSideBerthSuffix(item.parts.suffix)).map((item) => item.seat.row))].sort((a, b) => a - b);
     const rowToSeaterRow = new Map(topRows.map((row, index) => [row, index === 0 ? 1 : 2]));
-    const topColumns = [...new Set(parsed.filter((item) => item.parts.suffix !== "L").map((item) => item.seat.column))].sort((a, b) => a - b);
+    const topColumns = [...new Set(parsed.filter((item) => !isSingleSideBerthSuffix(item.parts.suffix)).map((item) => item.seat.column))].sort((a, b) => a - b);
     const topColumnMap = new Map(topColumns.map((column, index) => [column, index + 1]));
     const singleSideSeats = parsed
-      .filter((item) => item.parts.suffix === "L")
+      .filter((item) => isSingleSideBerthSuffix(item.parts.suffix))
       .sort((a, b) => a.seat.column - b.seat.column || a.parts.number - b.parts.number);
     const singleSideColumnMap = new Map(singleSideSeats.map((item, index) => [item.parts.label, (index * 2) + 1]));
     const columns = Math.max(1, topColumns.length, singleSideSeats.length * 2);
     const orderedSeats = parsed.map(({ seat, parts }) => {
-      const isSingleSide = parts.suffix === "L";
+      const isSingleSide = isSingleSideBerthSuffix(parts.suffix);
       const isBerth = isSingleSide || Boolean(seat.isBerth);
       const seaterRow = parts.suffix === "B" ? 1 : parts.suffix === "A" ? 2 : rowToSeaterRow.get(seat.row) || 1;
       return {
@@ -1022,7 +1439,8 @@ function buildLabelOrderedDeckLayout(seats) {
       rowTracks: `${seatTrack}px ${seatTrack}px 34px ${seatTrack}px`,
       aisleRow: 3,
       rotated: false,
-      orderedByLabel: true
+      orderedByLabel: true,
+      labelPattern: "lower-numeric-single-berth"
     };
   }
   const lowerSeatNumbers = hasBdsdLowerSeries
@@ -1084,12 +1502,7 @@ function buildLabelOrderedDeckLayout(seats) {
   };
 }
 
-function buildDeckLayout(seats) {
-  const measuredSeats = seats.map(normalizeApiSeat).filter(Boolean);
-  if (!measuredSeats.length) return { seats: [], rows: [], columns: 0 };
-  const labelOrderedLayout = buildLabelOrderedDeckLayout(measuredSeats);
-  if (labelOrderedLayout) return labelOrderedLayout;
-
+function buildGeometryDeckLayout(measuredSeats) {
   const rawRows = [...new Set(measuredSeats.map((seat) => seat.row))].sort((a, b) => a - b);
   const rawColumns = [...new Set(measuredSeats.map((seat) => seat.column))].sort((a, b) => a - b);
   const shouldRotateLandscape = rawRows.length > rawColumns.length + 2 && rawRows.length > 5;
@@ -1137,9 +1550,15 @@ function buildDeckLayout(seats) {
     row: rowStartToLane.get(seat.row) || seat.row
   }));
   const collisionSafeSeats = resolveSeatCollisions(rowCompressedSeats);
-  const rowCount = Math.max(...collisionSafeSeats.map((seat) => seat.row + (seat.height || 1) - 1));
-  const columns = Math.max(...collisionSafeSeats.map((seat) => seat.column + (seat.width || 1) - 1));
+  const initialRowCount = Math.max(...collisionSafeSeats.map((seat) => seat.row + (seat.height || 1) - 1));
   const hasBerths = collisionSafeSeats.some((seat) => seat.isBerth);
+  const allBerthRows = collisionSafeSeats.every((seat) => seat.isBerth) && initialRowCount >= 3;
+  const geometryAisleRow = allBerthRows ? initialRowCount : null;
+  const layoutSeats = geometryAisleRow
+    ? collisionSafeSeats.map((seat) => ({ ...seat, row: seat.row >= geometryAisleRow ? seat.row + 1 : seat.row }))
+    : collisionSafeSeats;
+  const rowCount = geometryAisleRow ? initialRowCount + 1 : initialRowCount;
+  const columns = Math.max(...layoutSeats.map((seat) => seat.column + (seat.width || 1) - 1));
   const gridGap = 8;
   const targetWidth = hasBerths ? 560 : 520;
   const targetHeight = hasBerths ? 108 : 86;
@@ -1149,13 +1568,233 @@ function buildDeckLayout(seats) {
   const seatTrack = `${compactSeatTrack}px`;
   const rowTrack = `${compactRowTrack}px`;
   const columnTracks = Array.from({ length: columns }, (_, index) => (index + 1 === aisleColumn ? `${aisleTrack}px` : seatTrack)).join(" ");
+  const rowTracks = geometryAisleRow
+    ? Array.from({ length: rowCount }, (_, index) => index + 1 === geometryAisleRow ? `${Math.max(28, compactRowTrack)}px` : rowTrack).join(" ")
+    : undefined;
   return {
-    seats: collisionSafeSeats.sort((a, b) => a.row - b.row || a.column - b.column),
+    seats: layoutSeats.sort((a, b) => a.row - b.row || a.column - b.column),
     rows: rowCount,
     columns,
+    aisleRow: geometryAisleRow || undefined,
     columnTracks,
+    rowTracks,
     rowTrack,
-    rotated: shouldRotateLandscape
+    rotated: shouldRotateLandscape,
+    layoutSource: "geometry"
+  };
+}
+
+function isUsableGeometryLayout(layout, originalSeats) {
+  if (!layout?.seats?.length || layout.seats.length < Math.max(1, Math.floor(originalSeats.length * 0.9))) return false;
+  if (!layout.rows || !layout.columns) return false;
+  if (layout.rows > 7 || layout.columns > 32) return false;
+  const maxArea = layout.rows * layout.columns;
+  if (maxArea > 180) return false;
+  return true;
+}
+
+function shouldPreferGeometryLayout(measuredSeats, geometryLayout, labelLayout) {
+  if (!isUsableGeometryLayout(geometryLayout, measuredSeats)) return false;
+  if (!labelLayout) return true;
+  if (labelLayout.aisleRow || labelLayout.aisleColumn) return false;
+  const suffixes = new Set(measuredSeats.map((seat) => seatLabelParts(seat)?.suffix).filter(Boolean));
+  const stableLabelFamilies = [
+    ["E", "G", "D", "F"],
+    ["LA", "LB", "LC"],
+    ["UA", "UB", "UC"]
+  ];
+  const hasStableLabelFamily = stableLabelFamilies.some((family) => family.some((suffix) => suffixes.has(suffix)));
+  const riskyLabelFamily = [...suffixes].every((suffix) => ["N", "L", "U", "SL", "SU", "S"].includes(suffix));
+  return riskyLabelFamily && !hasStableLabelFamily && geometryLayout.aisleRow;
+}
+
+function canonicalSeatOrder(seats) {
+  return [...seats].sort((a, b) =>
+    String(a.label || a.id).localeCompare(String(b.label || b.id), undefined, { numeric: true, sensitivity: "base" })
+  );
+}
+
+function buildCanonicalUpperSleeperLayout(seats) {
+  const ordered = canonicalSeatOrder(seats);
+  const berthRows = [1, 2, 4, 5];
+  return {
+    seats: ordered.map((seat, index) => ({
+      ...seat,
+      row: berthRows[index % berthRows.length],
+      column: (Math.floor(index / berthRows.length) * 2) + 1,
+      width: 2,
+      height: 1,
+      isBerth: true,
+      visualType: "berth"
+    })),
+    rows: 5,
+    columns: Math.max(2, Math.ceil(ordered.length / berthRows.length) * 2),
+    aisleRow: 3,
+    rotated: false,
+    layoutSource: "canonical-upper-2-plus-2"
+  };
+}
+
+function buildCanonicalLowerSeaterLayout(seats) {
+  const ordered = canonicalSeatOrder(seats);
+  const seatRows = [1, 2, 4, 5];
+  return {
+    seats: ordered.map((seat, index) => ({
+      ...seat,
+      row: seatRows[index % seatRows.length],
+      column: Math.floor(index / seatRows.length) + 1,
+      width: 1,
+      height: 1,
+      isBerth: false,
+      visualType: seat.visualType === "horizontal-seat" ? "horizontal-seat" : "seat"
+    })),
+    rows: 5,
+    columns: Math.max(1, Math.ceil(ordered.length / seatRows.length)),
+    aisleRow: 3,
+    rotated: false,
+    layoutSource: "canonical-lower-2-plus-2"
+  };
+}
+
+function buildDeckLayout(seats) {
+  const measuredSeats = seats.map(normalizeApiSeat).filter(Boolean);
+  if (!measuredSeats.length) return { seats: [], rows: [], columns: 0 };
+  if (measuredSeats.every((seat) => seat.deck === "upper")) {
+    return buildCanonicalUpperSleeperLayout(measuredSeats);
+  }
+  if (measuredSeats.every((seat) => !seat.isBerth)) {
+    return buildCanonicalLowerSeaterLayout(measuredSeats);
+  }
+  const geometryLayout = buildGeometryDeckLayout(measuredSeats);
+  const labelOrderedLayout = buildLabelOrderedDeckLayout(measuredSeats);
+  const preferredLayout = shouldPreferGeometryLayout(measuredSeats, geometryLayout, labelOrderedLayout)
+    ? geometryLayout
+    : labelOrderedLayout || geometryLayout;
+
+  // Some providers expose every seat in one or two coordinate rows. That is a
+  // data ordering convention, not a usable bus shape, so rebuild standard
+  // seater-only responses as a 2 + aisle + 2 cabin.
+  const standardSeatsOnly = preferredLayout.seats.every((seat) =>
+    !seat.isBerth && (seat.width || 1) === 1 && (seat.height || 1) === 1
+  );
+  if (standardSeatsOnly && preferredLayout.rows <= 2 && preferredLayout.columns > 10) {
+    const ordered = [...preferredLayout.seats].sort((a, b) =>
+      a.row - b.row || a.column - b.column || String(a.id).localeCompare(String(b.id), undefined, { numeric: true })
+    );
+    return {
+      ...preferredLayout,
+      seats: ordered.map((seat, index) => ({
+        ...seat,
+        row: [1, 2, 4, 5][index % 4],
+        column: Math.floor(index / 4) + 1
+      })),
+      rows: 5,
+      columns: Math.ceil(ordered.length / 4),
+      aisleRow: 3,
+      aisleColumn: undefined,
+      labelPattern: preferredLayout.labelPattern || "compact-seater-fallback"
+    };
+  }
+  return preferredLayout;
+}
+
+function normalizeDeckVisualScale(layout) {
+  if (!layout?.seats?.length) return layout;
+
+  // API coordinates describe proportions, not pixels. A shared unit keeps seat
+  // and berth dimensions identical across operators and across both decks.
+  const gap = layout.columns > 14 ? 5 : layout.columns > 10 ? 6 : 8;
+  const availableGridWidth = 620;
+  const seatTrack = Math.max(20, Math.min(34,
+    Math.floor((availableGridWidth - Math.max(0, layout.columns - 1) * gap) / Math.max(layout.columns, 1))
+  ));
+  const aisleTrack = 28;
+  const columnTracks = Array.from({ length: layout.columns }, (_, index) =>
+    index + 1 === layout.aisleColumn ? `${aisleTrack}px` : `${seatTrack}px`
+  ).join(" ");
+  const rowTracks = Array.from({ length: layout.rows }, (_, index) =>
+    index + 1 === layout.aisleRow ? `${aisleTrack}px` : `${seatTrack}px`
+  ).join(" ");
+
+  return {
+    ...layout,
+    columnTracks,
+    rowTracks,
+    rowTrack: `${seatTrack}px`,
+    gridGap: `${gap}px ${gap}px`
+  };
+}
+
+function harmonizePairedUpperDeck(lower, upper) {
+  if (lower?.seats?.length && upper?.seats?.length) {
+    const lowerAisleRow = lower.aisleRow;
+    const occupiedLowerRows = [...new Set(lower.seats.map((seat) => seat.row))].sort((a, b) => a - b);
+    const upperBerthRows = lowerAisleRow
+      ? occupiedLowerRows.filter((row) => row !== lowerAisleRow)
+      : [];
+    const upperAboveRows = upperBerthRows.filter((row) => row < lowerAisleRow);
+    const upperBelowRows = upperBerthRows.filter((row) => row > lowerAisleRow);
+    const orderedUpperSeats = canonicalSeatOrder(upper.seats);
+    const upperFamilies = orderedUpperSeats.map((seat) => ({ seat, parts: seatLabelParts(seat) }));
+    const pairedUpperSeats = upperFamilies.filter(({ parts }) => parts?.suffix === "U");
+    const singleUpperSeats = upperFamilies.filter(({ parts }) => parts?.suffix === "SU");
+    const hasUpperFamilyPattern = upperAboveRows.length === 2 && upperBelowRows.length === 1 &&
+      pairedUpperSeats.length > 0 && singleUpperSeats.length > 0 &&
+      pairedUpperSeats.length + singleUpperSeats.length === orderedUpperSeats.length &&
+      pairedUpperSeats.length <= singleUpperSeats.length * 2 + 2;
+    const familyPackedSeats = hasUpperFamilyPattern
+      ? [
+          ...pairedUpperSeats.map(({ seat }, index) => ({
+            ...seat,
+            row: upperAboveRows[index % 2],
+            column: (Math.floor(index / 2) * 2) + 1,
+            width: 2,
+            height: 1,
+            isBerth: true,
+            visualType: "berth"
+          })),
+          ...singleUpperSeats.map(({ seat }, index) => ({
+            ...seat,
+            row: upperBelowRows[0],
+            column: (index * 2) + 1,
+            width: 2,
+            height: 1,
+            isBerth: true,
+            visualType: "berth"
+          }))
+        ]
+      : null;
+    const mirroredUpper = upperBerthRows.length > 0
+      ? {
+          ...upper,
+          seats: familyPackedSeats || orderedUpperSeats.map((seat, index) => ({
+            ...seat,
+            row: upperBerthRows[index % upperBerthRows.length],
+            column: (Math.floor(index / upperBerthRows.length) * 2) + 1,
+            width: 2,
+            height: 1,
+            isBerth: true,
+            visualType: "berth"
+          })),
+          rows: lower.rows,
+          columns: Math.max(2, familyPackedSeats
+            ? Math.max(Math.ceil(pairedUpperSeats.length / 2), singleUpperSeats.length) * 2
+            : Math.ceil(upper.seats.length / upperBerthRows.length) * 2),
+          aisleRow: lowerAisleRow,
+          aisleColumn: undefined,
+          layoutSource: `mirrored-upper-${upperBerthRows.filter((row) => row < lowerAisleRow).length}-plus-${upperBerthRows.filter((row) => row > lowerAisleRow).length}`
+        }
+      : upper;
+    const sharedColumns = Math.max(lower.columns || 0, mirroredUpper.columns || 0);
+    const sharedRows = Math.max(lower.rows || 0, mirroredUpper.rows || 0);
+    return {
+      lower: normalizeDeckVisualScale({ ...lower, columns: sharedColumns, rows: sharedRows }),
+      upper: normalizeDeckVisualScale({ ...mirroredUpper, columns: sharedColumns, rows: sharedRows })
+    };
+  }
+  return {
+    lower: normalizeDeckVisualScale(lower),
+    upper: normalizeDeckVisualScale(upper)
   };
 }
 
@@ -1177,8 +1816,9 @@ function PortraitSeatChart({ route, selected, setSelected }) {
 
   const lowerSeats = visibleSeats.filter((seat) => seat.deck !== "upper");
   const upperSeats = visibleSeats.filter((seat) => seat.deck === "upper");
-  const lower = buildDeckLayout(lowerSeats);
-  const upper = buildDeckLayout(upperSeats);
+  const builtLower = buildDeckLayout(lowerSeats);
+  const builtUpper = buildDeckLayout(upperSeats);
+  const { lower, upper } = harmonizePairedUpperDeck(builtLower, builtUpper);
   if (!lower.seats.length && !upper.seats.length) {
     return <div className="empty-results">No seats to show for this bus.</div>;
   }
@@ -1220,19 +1860,20 @@ function DeckPlaceholder({ title }) {
 
 function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, baseFare }) {
   const renderSeat = (seat) => {
-    const sold = unavailable.has(seat.id);
+    const sold = unavailable.has(seat.id) || booleanFrom(seat.isUnavailable, seat.IsBooked, seat.Booked, seat.IsBlocked, seat.Blocked, seat.Available === false ? true : null);
     const chosen = selected.includes(seat.id);
     const women = booleanFrom(seat.IsLadiesSeat, seat.LadiesSeat, seat.IsLadies, seat.ForLadies, seat.ladies);
     const isBerth = Boolean(seat.isBerth);
     const isHorizontalSeat = !isBerth && seat.visualType === "horizontal-seat";
     const isHorizontalBerth = isBerth && (seat.width || 1) > (seat.height || 1);
-    const fare = Number(seat.SeatFare || seat.Price?.OfferedPrice || seat.fare || 0) || Math.round(Number(baseFare) * (seat.fareMultiplier || 1));
+    const fare = seatFareAmount(seat, Math.round(Number(baseFare) * (seat.fareMultiplier || 1)));
     
     return (
       <button
         key={seat.id}
         className={`${isBerth ? "sleeper-berth" : "chair-seat"} ${isHorizontalSeat ? "horizontal-seat" : ""} ${isHorizontalBerth ? "horizontal-berth" : ""} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""} ${women ? "women" : ""}`}
         onClick={() => toggle(seat.id)}
+        disabled={sold}
         aria-label={`${title} seat ${seat.id}`}
         style={{
           gridColumnStart: seat.column,
@@ -1257,7 +1898,7 @@ function Deck({ title, layout, unavailable, selected, toggle, sleeper, mixed, ba
         <div className="portrait-seat-grid live-seat-grid" style={{
           gridTemplateColumns: layout.columnTracks || `repeat(${layout.columns || 4}, 46px)`,
           gridTemplateRows: layout.rowTracks || `repeat(${layout.rows || 1}, ${layout.rowTrack || "46px"})`,
-          gap: "8px 10px",
+          gap: layout.gridGap || "8px 10px",
           justifyContent: "start",
         }}>
           {layout.aisleRow && <div className="bus-aisle horizontal-aisle" style={{
@@ -1379,7 +2020,7 @@ function BookingModal({ route, query, user, message, onClose, onBuy }) {
   const boardingPoints = [`${route.origin} Central`, `${route.origin} Circle`, `${route.origin} Bus Terminal`];
   const droppingPoints = [`${route.destination} Central`, `${route.destination} Market`, `${route.destination} Bus Terminal`];
   const seats = selectedSeats.length ? selectedSeats : passengers.map((_, index) => `AUTO-${index + 1}`);
-  const total = Number(route.price) * Math.max(seats.length, passengers.length);
+  const total = selectedSeats.length ? selectedSeatFareTotal(route, selectedSeats) : Number(route.price) * Math.max(seats.length, passengers.length);
   useEffect(() => {
     document.body.classList.add("modal-open");
     return () => document.body.classList.remove("modal-open");
@@ -1417,7 +2058,8 @@ function BoardDropStep({ boardingPoints, droppingPoints, boardingPoint, setBoard
 }
 
 function PointList({ title, subtitle, points, selected, setSelected, start }) {
-  return <article className="point-card"><h3>{title}</h3><p>{subtitle}</p>{points.map((point, index) => <button key={point} className={selected === point ? "active" : ""} onClick={() => setSelected(point)}><b>{index === 0 ? start : index === 1 ? "06:55" : "07:05"}</b><span>{point}<small>{point.toUpperCase()}</small></span><i /></button>)}</article>;
+  const visiblePoints = uniqueDisplayNames(points);
+  return <article className="point-card"><h3>{title}</h3><p>{subtitle}</p>{visiblePoints.map((point, index) => <button key={`${point}-${index}`} className={selected === point ? "active" : ""} onClick={() => setSelected(point)}><b>{index === 0 ? start : index === 1 ? "06:55" : "07:05"}</b><span>{point}<small>{point.toUpperCase()}</small></span><i /></button>)}</article>;
 }
 
 function SeatDetailsStep({ route, selectedSeats, setSelectedSeats }) {
@@ -1499,8 +2141,8 @@ function JourneyResults({ type, results, query, onViewSeats }) {
     return seats.filter((seat) => !seat.isWalkway && !unavailable.has(seat.id)).length;
   };
 
-  const boardingPoints = [...new Set(results.flatMap((route) => routeBoardingPoints(route).map((point) => point.name.split(" ")[0])))].slice(0, 8);
-  const droppingPoints = [...new Set(results.flatMap((route) => routeDroppingPoints(route).map((point) => point.name.split(" ")[0])))].slice(0, 8);
+  const boardingPoints = uniqueDisplayNames(results.flatMap((route) => routeBoardingPoints(route).map((point) => point.name.split(" ")[0]))).slice(0, 8);
+  const droppingPoints = uniqueDisplayNames(results.flatMap((route) => routeDroppingPoints(route).map((point) => point.name.split(" ")[0]))).slice(0, 8);
   const operators = [...new Set(results.map((route) => route.providerName))].slice(0, 8);
 
   const operatorFiltered = results;
@@ -1538,10 +2180,10 @@ function JourneyResults({ type, results, query, onViewSeats }) {
   ];
 
   const stateBoardGroups = type === "bus"
-    ? operatorBrands.map((brand) => ({
+    ? operatorBrands.filter((brand) => routeRelevantStateBoardKeys(query, filtered).has(brand.key)).map((brand) => ({
       brand,
       routes: filtered.filter((route) => operatorBrand(route)?.key === brand.key)
-    })).filter((group) => group.routes.length)
+    }))
     : [];
   const privateRoutes = type === "bus" ? filtered.filter((route) => !operatorBrand(route)) : filtered;
   const visibleResultCount = type === "bus"
@@ -1687,25 +2329,27 @@ function JourneyResults({ type, results, query, onViewSeats }) {
         <div className="result-list">
           {stateBoardGroups.map(({ brand, routes }) => {
             const expanded = Boolean(expandedStateBoards[brand.key]);
-            const minFare = Math.min(...routes.map((route) => Number(route.price || 0)));
+            const hasRoutes = routes.length > 0;
+            const minFare = hasRoutes ? Math.min(...routes.map((route) => Number(route.price || 0))) : null;
             const totalSeats = routes.reduce((count, route) => count + availableSeats(route), 0);
             const bestRating = Math.max(...routes.map((route) => Number(route.rating || 0)));
             return (
-              <section key={brand.key} className={`state-board-block ${expanded ? "open" : ""}`}>
+              <section key={brand.key} className={`state-board-block ${expanded ? "open" : ""} ${hasRoutes ? "" : "empty"}`}>
                 <button
                   type="button"
                   className="state-board-card"
-                  onClick={() => setExpandedStateBoards((current) => ({ ...current, [brand.key]: !current[brand.key] }))}
+                  onClick={() => hasRoutes && setExpandedStateBoards((current) => ({ ...current, [brand.key]: !current[brand.key] }))}
                   aria-expanded={expanded}
+                  disabled={!hasRoutes}
                 >
                   <span className="state-board-logo"><img src={brand.logo} alt={`${brand.title} logo`} /></span>
                   <span className="state-board-copy">
                     <strong>{brand.title}</strong>
                     <small>{brand.subtitle}</small>
-                    <em>{routes.length} buses · {totalSeats} seats available {bestRating ? `· ★ ${formatRating(bestRating)}` : ""}</em>
+                    <em>{hasRoutes ? `${routes.length} buses · ${totalSeats} seats available ${bestRating ? `· ★ ${formatRating(bestRating)}` : ""}` : "No state-board buses returned for this search"}</em>
                   </span>
-                  <span className="state-board-price"><small>From</small><b>₹{Number(minFare).toLocaleString("en-IN")}</b></span>
-                  <span className="state-board-action">View buses <ChevronDown size={18} /></span>
+                  <span className="state-board-price">{hasRoutes ? <><small>From</small><b>₹{Number(minFare).toLocaleString("en-IN")}</b></> : <small>Unavailable</small>}</span>
+                  <span className="state-board-action">{hasRoutes ? "View buses" : "No buses"} <ChevronDown size={18} /></span>
                 </button>
                 {expanded && <div className="state-board-routes">{routes.map(renderRouteCard)}</div>}
               </section>
@@ -2222,7 +2866,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
     <section className="page-band checkout-page">
       {!confirmed && isBus && <button type="button" className="checkout-back" onClick={() => setPage("booking")}><ArrowLeft size={18} /> Back to seats</button>}
       <div className="page-heading"><CalendarDays size={34} /><div><h1>{confirmed ? "Booking successful" : isHotel ? "Review your stay" : "Review your ticket"}</h1><p>{confirmed ? "Your printable Orbita Travels booking is ready." : "Confirm traveller details before purchasing."}</p></div></div>
-      <article className="print-ticket">
+      {confirmed ? <OperatorTicket booking={confirmed} /> : <article className="print-ticket">
         <div className="ticket-head"><Logo /><strong>{confirmed?.bookingCode || "PNR will be generated after purchase"}</strong></div>
         <h2>{draft.route.providerName}</h2>
         <p>{routeLine}</p>
@@ -2252,7 +2896,8 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
         <p className="identity-note">{isBus ? "The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding." : "Please carry a valid government-issued ID matching the traveller or guest details."}</p>
         {!confirmed ? <button className="primary" onClick={purchase} disabled={purchasing}>{purchasing ? "Processing payment..." : isHotel ? "Pay and book room" : "Pay and purchase ticket"}</button> : <><button className="primary" onClick={() => window.print()}>Print booking</button><button className="secondary-action" onClick={() => setPage("dashboard")}>Back to dashboard</button></>}
         {message && <div className="success-note">{confirmed ? <span>Booking confirmed with PNR <strong>{confirmed.bookingCode}</strong>. {message}</span> : <span>{message}</span>}</div>}
-      </article>
+      </article>}
+      {confirmed && <div className="ticket-confirm-actions"><button className="primary" onClick={() => window.print()}>Print booking</button><button className="secondary-action" onClick={() => setPage("dashboard")}>Back to dashboard</button>{message && <div className="success-note">Booking confirmed with PNR <strong>{confirmed.bookingCode}</strong>. {message}</div>}</div>}
     </section>
   );
 }
@@ -2356,11 +3001,122 @@ function BookingCard({ booking, onCancel, compact, onViewTicket }) {
   return <div className="booking-card"><div><b>{booking.bookingCode}</b><span>{booking.type} · {title}</span></div><div><small>{booking.travelDate}</small><strong>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</strong></div><div className="booking-finance-row"><span>Booking status <b>{booking.status}</b></span><span>Payment <b>{booking.paymentStatus}</b></span>{refund !== undefined && <span>Refund <b>₹{Number(refund).toLocaleString("en-IN")}</b></span>}</div><div className="tracking-line">Provider updates · {booking.metadata?.cancellation?.status || booking.metadata?.bdsdBookingError || "synced"}</div><div className="booking-actions"><button onClick={onViewTicket}>View ticket</button>{!compact && <><button>Modify</button>{canCancel && <button onClick={onCancel}>Cancel and refund</button>}<button>Re-book</button></>}</div></div>;
 }
 
-function TicketWindow({ booking, onClose }) {
+const ticketDate = (value, options = {}) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", ...options });
+};
+
+const ticketTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+};
+
+const ticketMoney = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
+
+function ticketServiceNumber(booking) {
+  return booking.TransportRoute?.externalRouteId || booking.TransportRoute?.routeCode || booking.metadata?.serviceNo || booking.bookingCode;
+}
+
+function ticketProviderPnr(booking) {
+  const bdsd = booking.metadata?.bdsdBooking || {};
+  return bdsd.PNR || bdsd.pnr || bdsd.TicketNo || bdsd.ticketNo || bdsd.BookingId || bdsd.bookingId || booking.bookingCode;
+}
+
+function OperatorTicket({ booking }) {
   const providerName = booking.TransportRoute?.providerName || booking.Hotel?.name || booking.TourPackage?.title || booking.metadata?.title || "Orbita Travels";
-  const from = booking.metadata?.origin || booking.TransportRoute?.origin || "-";
-  const to = booking.metadata?.destination || booking.TransportRoute?.destination || "-";
+  const from = booking.metadata?.origin || booking.TransportRoute?.origin || booking.Hotel?.city || "-";
+  const to = booking.metadata?.destination || booking.TransportRoute?.destination || booking.Hotel?.city || "-";
   const seats = booking.selectedSeats?.length ? booking.selectedSeats : (booking.passengers || []).map((passenger) => passenger.seat).filter(Boolean);
+  const passengers = booking.passengers?.length ? booking.passengers : [{ name: "Passenger details not available", age: "-", gender: "-", seat: seats[0] || "-" }];
+  const total = Number(booking.totalAmount || 0);
+  const payment = booking.metadata?.payment || {};
+  const cancellation = booking.metadata?.cancellation || {};
+  const travelDate = booking.travelDate || booking.metadata?.travelDate;
+  const departureTime = booking.TransportRoute?.departureTime || travelDate;
+  const arrivalTime = booking.TransportRoute?.arrivalTime || booking.metadata?.arrivalTime;
+  const busType = [booking.TransportRoute?.vehicleType, booking.TransportRoute?.classType].filter(Boolean).join(", ") || booking.type?.toUpperCase() || "Travel service";
+  return (
+    <article className="operator-ticket">
+      <div className="ticket-print-meta"><span>{ticketDate(booking.createdAt, { hour: "2-digit", minute: "2-digit" })}</span><b>Ticket - Orbita Travels</b><span>1/1</span></div>
+      <div className="ticket-promo-banner">
+        <div><strong>ORBITA TRAVELS</strong><span>Confirmed journey ticket</span></div>
+        <i aria-hidden="true" />
+      </div>
+      <div className="operator-brand-row"><Logo /><span>Support: Help and Support inside Orbita account</span></div>
+      <div className="ticket-title-row">
+        <div><h2>Orbita Ticket</h2><p>Booked on {ticketDate(booking.createdAt, { hour: "2-digit", minute: "2-digit" })}</p></div>
+        <div><span>Booking ID: <b>{booking.bookingCode}</b></span><span>Bus Partner PNR: <b>{ticketProviderPnr(booking)}</b></span></div>
+      </div>
+      <div className="ticket-operator-row">
+        <div><h3>{providerName}</h3><p>{seats.length || passengers.length} passenger(s) · {busType}</p><small>Bus start time: {ticketTime(departureTime)}</small></div>
+        <div><h3>Service # {ticketServiceNumber(booking)}</h3><p>{providerName}</p><small>Payment: {booking.paymentStatus || "paid"} · Status: {booking.status || "confirmed"}</small></div>
+      </div>
+      <div className="ticket-trip-row">
+        <div><span>Departure</span><h3>{from}</h3><p>{ticketDate(travelDate)}</p><b>{ticketTime(departureTime)}</b></div>
+        <div><span>Boarding Point:</span><p>{booking.metadata?.boardingPoint || from}</p></div>
+        <strong>→</strong>
+        <div><span>Arrival</span><h3>{to}</h3><b>{ticketTime(arrivalTime)}</b></div>
+        <div><span>Dropping Point:</span><p>{booking.metadata?.dropPoint || to}</p></div>
+      </div>
+      <div className="ticket-two-column">
+        <section>
+          <h3>Passenger Details</h3>
+          <table>
+            <thead><tr><th>Name</th><th>Gender</th><th>Age</th><th>Seat No</th></tr></thead>
+            <tbody>{passengers.map((passenger, index) => <tr key={index}><td>{passenger.name || `Passenger ${index + 1}`}</td><td>{passenger.gender || "-"}</td><td>{passenger.age || "-"}</td><td>{passenger.seat || seats[index] || "-"}</td></tr>)}</tbody>
+          </table>
+        </section>
+        <section>
+          <h3>Payment Details</h3>
+          <dl className="ticket-payment-list">
+            <div><dt>Total fare</dt><dd>{ticketMoney(total)}</dd></div>
+            <div><dt>Payment provider</dt><dd>{payment.provider || "Razorpay"}</dd></div>
+            <div><dt>Payment ID</dt><dd>{payment.paymentId || "-"}</dd></div>
+            <div className="amount-paid"><dt>Amount Paid</dt><dd>{ticketMoney(total)}</dd></div>
+          </dl>
+        </section>
+      </div>
+      <section className="ticket-info-block">
+        <h3>Important information</h3>
+        <ul>
+          <li>Please reach the boarding point before the reporting time shared by the operator.</li>
+          <li>Carry Aadhaar card or any valid government identity card while boarding.</li>
+          <li>For operator or refund issues, raise a request from Help and Support with this booking ID.</li>
+        </ul>
+      </section>
+      <div className="ticket-footer-grid">
+        <section>
+          <h3>Terms and Conditions</h3>
+          <ul>
+            <li>Departure and arrival times are tentative and may vary due to traffic, weather or operational changes.</li>
+            <li>Passengers should reach the selected boarding point at least 15 minutes before scheduled departure.</li>
+            <li>Orbita is not responsible for personal belongings left inside the vehicle.</li>
+            <li>Cancellation charges are applied as per operator policy and original payment method timelines.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Cancellation Policy</h3>
+          <table>
+            <thead><tr><th>Cancellation Time</th><th>Refund</th><th>Refund Amount</th></tr></thead>
+            <tbody>
+              <tr><td>Before 24 hours</td><td>90%</td><td>{ticketMoney(Math.round(total * 0.9))}</td></tr>
+              <tr><td>12 - 24 hours</td><td>75%</td><td>{ticketMoney(Math.round(total * 0.75))}</td></tr>
+              <tr><td>6 - 12 hours</td><td>50%</td><td>{ticketMoney(Math.round(total * 0.5))}</td></tr>
+              <tr><td>After cancellation</td><td>{cancellation.refundPercent ?? "-"}%</td><td>{cancellation.refundAmount !== undefined ? ticketMoney(cancellation.refundAmount) : "-"}</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+      <div className="ticket-copyright">Copyright Orbita Travels. All rights reserved.</div>
+    </article>
+  );
+}
+
+function TicketWindow({ booking, onClose }) {
   return (
     <div className="ticket-window-backdrop" role="dialog" aria-modal="true">
       <article className="ticket-window">
@@ -2372,40 +3128,7 @@ function TicketWindow({ booking, onClose }) {
           <button className="ticket-window-close" onClick={onClose}>Close</button>
         </div>
         <div className="ticket-window-body">
-          <article className="print-ticket">
-            <div className="ticket-head"><Logo /><strong>{booking.bookingCode}</strong></div>
-            <h2>{providerName}</h2>
-            <p>{from} to {to} · {booking.travelDate}</p>
-            <div className="ticket-grid">
-              <span>Status<b>{booking.status}</b></span>
-              <span>Payment<b>{booking.paymentStatus}</b></span>
-              <span>Seats<b>{seats.length ? seats.join(", ") : "-"}</b></span>
-              <span>Amount<b>₹{Number(booking.totalAmount).toLocaleString("en-IN")}</b></span>
-            </div>
-            {booking.metadata?.payment && <div className="ticket-grid">
-              <span>Payment provider<b>{booking.metadata.payment.provider || "razorpay"}</b></span>
-              <span>Order ID<b>{booking.metadata.payment.orderId || "-"}</b></span>
-              <span>Payment ID<b>{booking.metadata.payment.paymentId || "-"}</b></span>
-              <span>Verified<b>{booking.metadata.payment.verified ? "Yes" : "Pending"}</b></span>
-            </div>}
-            {booking.metadata?.cancellation && <div className="ticket-grid">
-              <span>Cancellation<b>{booking.metadata.cancellation.status}</b></span>
-              <span>Refund policy<b>{booking.metadata.cancellation.refundPercent}%</b></span>
-              <span>Refund amount<b>₹{Number(booking.metadata.cancellation.refundAmount || 0).toLocaleString("en-IN")}</b></span>
-              <span>Refund ID<b>{booking.metadata.cancellation.refund?.id || booking.metadata.cancellation.refund?.error || "-"}</b></span>
-            </div>}
-            <h3>Passengers</h3>
-            {(booking.passengers || []).map((passenger, index) => (
-              <div className="ticket-passenger" key={index}>
-                <span>{passenger.name || `Passenger ${index + 1}`}</span>
-                <span>{passenger.age || "-"} yrs</span>
-                <span>{passenger.gender || "-"}</span>
-                <b>{passenger.seat || seats[index] || "-"}</b>
-              </div>
-            ))}
-            {!(booking.passengers || []).length && <div className="ticket-passenger"><span>Passenger details not available</span><span>-</span><span>-</span><b>-</b></div>}
-            <p className="identity-note">Please carry a valid ID proof while boarding.</p>
-          </article>
+          <OperatorTicket booking={booking} />
         </div>
       </article>
     </div>
