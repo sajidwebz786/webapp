@@ -1785,11 +1785,31 @@ function harmonizePairedUpperDeck(lower, upper) {
           layoutSource: `mirrored-upper-${upperBerthRows.filter((row) => row < lowerAisleRow).length}-plus-${upperBerthRows.filter((row) => row > lowerAisleRow).length}`
         }
       : upper;
-    const sharedColumns = Math.max(lower.columns || 0, mirroredUpper.columns || 0);
+    const occupiedColumns = (layout) => Math.max(1, ...layout.seats.map((seat) => seat.column + (seat.width || 1) - 1));
+    const lowerOccupiedColumns = occupiedColumns(lower);
+    const upperOccupiedColumns = occupiedColumns(mirroredUpper);
+    const sharedColumns = Math.max(lowerOccupiedColumns, upperOccupiedColumns);
     const sharedRows = Math.max(lower.rows || 0, mirroredUpper.rows || 0);
+    const stretchToRear = (layout, contentColumns) => {
+      if (contentColumns >= sharedColumns || contentColumns <= 1) return layout;
+      return {
+        ...layout,
+        seats: layout.seats.map((seat) => {
+          const width = seat.width || 1;
+          const sourceTravel = Math.max(1, contentColumns - width);
+          const targetTravel = Math.max(1, sharedColumns - width);
+          return {
+            ...seat,
+            column: 1 + Math.round(((seat.column - 1) / sourceTravel) * targetTravel)
+          };
+        })
+      };
+    };
+    const stretchedLower = stretchToRear(lower, lowerOccupiedColumns);
+    const stretchedUpper = stretchToRear(mirroredUpper, upperOccupiedColumns);
     return {
-      lower: normalizeDeckVisualScale({ ...lower, columns: sharedColumns, rows: sharedRows }),
-      upper: normalizeDeckVisualScale({ ...mirroredUpper, columns: sharedColumns, rows: sharedRows })
+      lower: normalizeDeckVisualScale({ ...stretchedLower, columns: sharedColumns, rows: sharedRows }),
+      upper: normalizeDeckVisualScale({ ...stretchedUpper, columns: sharedColumns, rows: sharedRows })
     };
   }
   return {
