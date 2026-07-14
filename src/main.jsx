@@ -1635,9 +1635,30 @@ function buildCanonicalUpperSleeperLayout(seats) {
   };
 }
 
-function buildCanonicalLowerSeaterLayout(seats) {
+function buildCanonicalLowerSleeperLayout(seats) {
   const ordered = canonicalSeatOrder(seats);
-  const seatRows = [1, 2, 4, 5];
+  const rawLaneCount = new Set(ordered.map((seat) => seat.row)).size;
+  const berthRows = rawLaneCount === 4 ? [1, 2, 4, 5] : [1, 2, 4];
+  return {
+    seats: ordered.map((seat, index) => ({
+      ...seat,
+      row: berthRows[index % berthRows.length],
+      column: (Math.floor(index / berthRows.length) * 2) + 1,
+      width: 2,
+      height: 1,
+      isBerth: true,
+      visualType: "berth"
+    })),
+    rows: Math.max(...berthRows),
+    columns: Math.max(2, Math.ceil(ordered.length / berthRows.length) * 2),
+    aisleRow: 3,
+    rotated: false,
+    layoutSource: `canonical-lower-sleeper-${berthRows.length === 4 ? "2-plus-2" : "2-plus-1"}`
+  };
+}
+
+function buildCanonicalLowerSeaterLayout(seats, seatRows = [1, 2, 4, 5]) {
+  const ordered = canonicalSeatOrder(seats);
   return {
     seats: ordered.map((seat, index) => ({
       ...seat,
@@ -1648,7 +1669,7 @@ function buildCanonicalLowerSeaterLayout(seats) {
       isBerth: false,
       visualType: seat.visualType === "horizontal-seat" ? "horizontal-seat" : "seat"
     })),
-    rows: 5,
+    rows: Math.max(...seatRows),
     columns: Math.max(1, Math.ceil(ordered.length / seatRows.length)),
     aisleRow: 3,
     rotated: false,
@@ -1662,8 +1683,13 @@ function buildDeckLayout(seats) {
   if (measuredSeats.every((seat) => seat.deck === "upper")) {
     return buildCanonicalUpperSleeperLayout(measuredSeats);
   }
+  if (measuredSeats.every((seat) => seat.isBerth)) {
+    return buildCanonicalLowerSleeperLayout(measuredSeats);
+  }
   if (measuredSeats.every((seat) => !seat.isBerth)) {
-    return buildCanonicalLowerSeaterLayout(measuredSeats);
+    const providerLaneCount = new Set(measuredSeats.map((seat) => seat.row)).size;
+    const lowerSeatRows = providerLaneCount === 3 ? [1, 2, 4] : [1, 2, 4, 5];
+    return buildCanonicalLowerSeaterLayout(measuredSeats, lowerSeatRows);
   }
   const geometryLayout = buildGeometryDeckLayout(measuredSeats);
   const labelOrderedLayout = buildLabelOrderedDeckLayout(measuredSeats);
@@ -1828,7 +1854,13 @@ function PortraitSeatChart({ route, selected, setSelected }) {
     return <div className="empty-results">Loading live seat layout...</div>;
   }
 
-  const apiSeats = extractSeatList(route.seatLayout).map(normalizeApiSeat).filter(Boolean);
+  const routeTypeText = String(route.classType || route.vehicleType || route.seatLayout?.type || "").toLowerCase();
+  const sleeperOnlyRoute = routeTypeText.includes("sleeper") && !/(seat|seater|sitting|mixed)/.test(routeTypeText);
+  const apiSeats = extractSeatList(route.seatLayout).map(normalizeApiSeat).filter(Boolean).map((seat) => sleeperOnlyRoute ? {
+    ...seat,
+    isBerth: true,
+    visualType: "berth"
+  } : seat);
   const visibleSeats = apiSeats.filter((seat) => !seat.isWalkway);
   if (route.seatLayoutError || !route.seatLayout || !visibleSeats.length) {
     return <div className="empty-results">No seats to show for this bus.</div>;
