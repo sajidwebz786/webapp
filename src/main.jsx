@@ -353,7 +353,7 @@ function App() {
     api("/catalog/cities").then(setCities);
     api("/catalog/packages").then(setPackages);
     api("/catalog/hotels").then(setHotels);
-    api("/auth/me").then((data) => setUser(data.user)).catch(() => {});
+    if (tokenStore.get()) api("/auth/me").then((data) => setUser(data.user)).catch(() => tokenStore.clear());
   }, []);
 
   useEffect(() => {
@@ -694,7 +694,7 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
 
 function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuthReturnPage, bookingResumeState, setBookingResumeState }) {
   const savedState = bookingResumeState?.routeId === activeJourney?.route?.id ? bookingResumeState : null;
-  const [step, setStep] = useState(savedState?.step || "points");
+  const [step, setStep] = useState(savedState?.step || "seats");
   const [liveRoute, setLiveRoute] = useState(null);
   const [livePoints, setLivePoints] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState(savedState?.selectedSeats || []);
@@ -713,7 +713,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
     const selectedRoute = activeJourney?.route;
     if (!selectedRoute?.id) return;
     const nextSavedState = bookingResumeState?.routeId === selectedRoute.id ? bookingResumeState : null;
-    setStep(nextSavedState?.step || (selectedRoute.type === "bus" ? "points" : "passenger"));
+    setStep(nextSavedState?.step || (selectedRoute.type === "bus" ? "seats" : "passenger"));
     setSelectedSeats(nextSavedState?.selectedSeats || []);
     setPassengers(nextSavedState?.passengers || (user ? [{ name: user.name || "", age: "", gender: "Male", seat: "" }] : [{ ...initialPassenger }]));
     setContact(nextSavedState?.contact || (user ? { email: user.email || "", phone: user.phone || "", emergencyPhone: "" } : { email: "", phone: "", emergencyPhone: "" }));
@@ -765,8 +765,8 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
   const canContinue = step === "points" ? boardingPoint && dropPoint : step === "seats" ? selectedSeats.length > 0 : true;
 
   const goBack = () => {
-    if (step === "passenger" && isBus) return setStep("seats");
-    if (step === "seats" && isBus) return setStep("points");
+    if (step === "passenger" && isBus) return setStep("points");
+    if (step === "points" && isBus) return setStep("seats");
     setPage(route.type || "bus");
   };
 
@@ -800,14 +800,14 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
         <div className="window-offer">Last min. 10% OFF</div>
       </div>
       <div className="wizard-tabs booking-tabs">
-        {(isBus ? ["points", "seats", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} onClick={() => item === "passenger" && !user ? (setBookingResumeState?.({ routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint }), setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
+        {(isBus ? ["seats", "points", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} disabled={(item === "points" || item === "passenger") && !selectedSeats.length} onClick={() => item === "passenger" && !user ? (setBookingResumeState?.({ routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint }), setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
       </div>
       {isBus && step === "points" && <BoardDropStep boardingPoints={boardingPoints} droppingPoints={droppingPoints} boardingPoint={boardingPoint} setBoardingPoint={setBoardingPoint} dropPoint={dropPoint} setDropPoint={setDropPoint} />}
       {isBus && step === "seats" && <div className="dedicated-seat-screen"><PortraitSeatChart route={route} selected={selectedSeats} setSelected={setSelectedSeats} /><BusProfilePanel route={route} /></div>}
       {step === "passenger" && <div className="passenger-screen"><div><PassengerForm query={query} selectedSeats={selectedSeats} passengers={passengers} setPassengers={setPassengers} contact={contact} setContact={setContact} mode={route.type} /><p className="identity-note">{isBus ? "The booking person must show Aadhaar card or any equivalent identity card to the bus attendant at the time of boarding." : "Traveller name and contact details should match the government ID used during travel."}</p></div><FareSummary total={total} route={route} boardingPoint={boardingPoint} dropPoint={dropPoint} seats={seats} /></div>}
       <div className="booking-bottom-bar">
         <div><span>Amount to pay</span><strong>₹{Number(total).toLocaleString("en-IN")}</strong></div>
-        {step !== "passenger" ? <button className="primary" disabled={!canContinue} onClick={() => step === "points" ? setStep("seats") : goPassenger()}>Continue</button> : <button className="primary" onClick={buy}>{isBus ? "Buy ticket" : "Review booking"}</button>}
+        {step !== "passenger" ? <button className="primary" disabled={!canContinue} onClick={() => step === "seats" ? setStep("points") : goPassenger()}>Continue</button> : <button className="primary" onClick={buy}>{isBus ? "Buy ticket" : "Review booking"}</button>}
       </div>
     </section>
   );
@@ -2141,12 +2141,12 @@ function JourneyResults({ type, results, query, onViewSeats }) {
   const [filters, setFilters] = useState([]);
   const [activeOperator, setActiveOperator] = useState("all");
   const [departureSlot, setDepartureSlot] = useState("any");
-  const [sortBy, setSortBy] = useState("price");
+  const [sortBy, setSortBy] = useState("price-asc");
   const [popularTab, setPopularTab] = useState("boarding");
   const [selectedPoint, setSelectedPoint] = useState("");
   const [busPartner, setBusPartner] = useState("");
   const [expandedStateBoards, setExpandedStateBoards] = useState({});
-  const routeMinPrice = Math.min(...results.map((route) => Number(route.price || 0)), 0);
+  const routeMinPrice = results.length ? Math.min(...results.map((route) => Number(route.price || 0))) : 0;
   const routeMaxPrice = Math.max(...results.map((route) => Number(route.price || 0)), 0);
   const [minPrice, setMinPrice] = useState(routeMinPrice);
   const [maxPrice, setMaxPrice] = useState(routeMaxPrice);
@@ -2157,7 +2157,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
     setMaxPrice(routeMaxPrice);
     setActiveOperator("all");
     setDepartureSlot("any");
-    setSortBy("price");
+    setSortBy("price-asc");
     setSelectedPoint("");
     setBusPartner("");
     setFilters([]);
@@ -2193,6 +2193,13 @@ function JourneyResults({ type, results, query, onViewSeats }) {
     return seats.filter((seat) => !seat.isWalkway && !unavailable.has(seat.id)).length;
   };
 
+  const timeValue = (value) => {
+    const timestamp = Date.parse(value);
+    if (Number.isFinite(timestamp)) return timestamp;
+    const match = String(value || "").match(/(\d{1,2}):(\d{2})/);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : Number.POSITIVE_INFINITY;
+  };
+
   const boardingPoints = uniqueDisplayNames(results.flatMap((route) => routeBoardingPoints(route).map((point) => point.name.split(" ")[0]))).slice(0, 8);
   const droppingPoints = uniqueDisplayNames(results.flatMap((route) => routeDroppingPoints(route).map((point) => point.name.split(" ")[0]))).slice(0, 8);
   const operators = [...new Set(results.map((route) => route.providerName))].slice(0, 8);
@@ -2206,11 +2213,12 @@ function JourneyResults({ type, results, query, onViewSeats }) {
     .filter((route) => !selectedPoint || routeBoardingPoints(route).some((point) => point.name.includes(selectedPoint)) || routeDroppingPoints(route).some((point) => point.name.includes(selectedPoint)) || route.providerName.includes(selectedPoint))
     .filter((route) => filters.every((key) => filterOptions.find((item) => item.key === key)?.test(route)))
     .sort((a, b) => {
-      if (sortBy === "price") return Number(a.price) - Number(b.price);
+      if (sortBy === "price-asc") return Number(a.price) - Number(b.price);
+      if (sortBy === "price-desc") return Number(b.price) - Number(a.price);
       if (sortBy === "seats") return availableSeats(b) - availableSeats(a);
       if (sortBy === "rating") return Number(b.rating || 0) - Number(a.rating || 0);
-      if (sortBy === "arrival") return new Date(a.arrivalTime) - new Date(b.arrivalTime);
-      if (sortBy === "departure") return new Date(a.departureTime) - new Date(b.departureTime);
+      if (sortBy === "arrival") return timeValue(a.arrivalTime) - timeValue(b.arrivalTime);
+      if (sortBy === "departure") return timeValue(a.departureTime) - timeValue(b.departureTime);
       return 0;
     });
 
@@ -2218,11 +2226,12 @@ function JourneyResults({ type, results, query, onViewSeats }) {
   const clearFilters = () => { setFilters([]); setDepartureSlot("any"); setMinPrice(routeMinPrice); setMaxPrice(routeMaxPrice); setBusPartner(""); setSelectedPoint(""); setActiveOperator("all"); };
 
   const sortOptions = [
-    ["price", "Price"],
-    ["seats", "Seats"],
-    ["rating", "Ratings"],
-    ["arrival", "Arrival Time"],
-    ["departure", "Departure Time"]
+    ["price-asc", "Lowest fare"],
+    ["price-desc", "Highest fare"],
+    ["departure", "Earliest departure"],
+    ["arrival", "Earliest arrival"],
+    ["rating", "Top rated"],
+    ["seats", "Most seats"]
   ];
 
   const offerCards = [
@@ -2355,7 +2364,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
         <div className="sort-bar">
           {sortOptions.map(([key, label]) => (
             <button key={key} type="button" className={sortBy === key ? "active" : ""} onClick={() => setSortBy(key)}>
-              {label} ↑
+              {label}
             </button>
           ))}
           <span className="result-count"><Bus size={16} /> Showing {visibleResultCount} {type === "bus" ? "buses" : type === "flight" ? "flights" : "trains"}{query?.from && query?.to ? ` · ${query.from} to ${query.to}` : ""} on this route</span>
@@ -2379,7 +2388,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
         <div className="mini-offers"><article>Free cancellation</article><article>Flexible date change</article><article>Women traveller care</article></div>
 
         <div className="result-list">
-          {stateBoardGroups.map(({ brand, routes }) => {
+          {type !== "bus" && stateBoardGroups.map(({ brand, routes }) => {
             const expanded = Boolean(expandedStateBoards[brand.key]);
             const hasRoutes = routes.length > 0;
             const minFare = hasRoutes ? Math.min(...routes.map((route) => Number(route.price || 0))) : null;
@@ -2407,8 +2416,7 @@ function JourneyResults({ type, results, query, onViewSeats }) {
               </section>
             );
           })}
-          {type === "bus" && privateRoutes.length > 0 && stateBoardGroups.length > 0 && <div className="private-result-heading"><span>Private bus results</span><b>{privateRoutes.length} buses</b></div>}
-          {privateRoutes.map(renderRouteCard)}
+          {type === "bus" ? filtered.map(renderRouteCard) : privateRoutes.map(renderRouteCard)}
           {!visibleResultCount && <div className="empty-results">No services match these filters. Remove one filter to see more options.</div>}
         </div>
       </div>
