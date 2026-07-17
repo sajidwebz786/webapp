@@ -707,19 +707,27 @@ function fallbackBusSeatLayout(route) {
   const description = `${route?.classType || ""} ${route?.vehicleType || ""}`.toLowerCase();
   const sleeper = description.includes("sleeper");
   const seats = [];
-  const rows = sleeper ? 10 : 11;
-  for (let row = 1; row <= rows; row += 1) {
-    if (sleeper) {
-      seats.push(
-        { id: `A${row}`, row, column: 1, deck: row > 5 ? "upper" : "lower", isBerth: true, visualType: "berth", fareMultiplier: 1.18 },
-        { id: `B${row}`, row, column: 3, deck: row > 5 ? "upper" : "lower", isBerth: true, visualType: "berth", fareMultiplier: 1 },
-        { id: `C${row}`, row, column: 4, deck: row > 5 ? "upper" : "lower", isBerth: true, visualType: "berth", fareMultiplier: 1 }
-      );
-    } else {
-      ["A", "B", "C", "D"].forEach((column, index) => seats.push({ id: `${column}${row}`, row, column: index + 1, deck: "lower", fareMultiplier: 1 }));
-    }
+  const seatCount = sleeper ? 30 : 40;
+  for (let index = 0; index < seatCount; index += 1) {
+    const lane = index % (sleeper ? 3 : 4);
+    const position = Math.floor(index / (sleeper ? 3 : 4)) + 1;
+    const label = `${String.fromCharCode(65 + lane)}${position}`;
+    seats.push({
+      id: label,
+      SeatName: label,
+      row: lane + 1,
+      column: position,
+      deck: sleeper && position > 5 ? "upper" : "lower",
+      isBerth: sleeper,
+      visualType: sleeper ? "berth" : "seat",
+      fareMultiplier: sleeper && lane === 0 ? 1.15 : 1
+    });
   }
-  return { type: sleeper ? "sleeper" : "seater", rows, cols: 4, unavailable: ["A3", "B4", "C7"], seats, isFallback: true };
+  return {
+    type: sleeper ? "sleeper" : "seater",
+    unavailable: ["A3", "B4", "C7"],
+    seats
+  };
 }
 
 function fallbackBusPoints(route) {
@@ -756,7 +764,9 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
     setContact(nextSavedState?.contact || (user ? { email: user.email || "", phone: user.phone || "", emergencyPhone: "" } : { email: "", phone: "", emergencyPhone: "" }));
     setBoardingPoint(nextSavedState?.boardingPoint || "");
     setDropPoint(nextSavedState?.dropPoint || "");
-    const initialLayout = selectedRoute.seatLayout?.seats?.length ? selectedRoute.seatLayout : fallbackBusSeatLayout(selectedRoute);
+    const storedLayout = extractSeatList(selectedRoute.seatLayout).length ? selectedRoute.seatLayout : null;
+    const fallbackLayout = fallbackBusSeatLayout(selectedRoute);
+    const initialLayout = storedLayout || fallbackLayout;
     setLiveRoute({ ...selectedRoute, seatLayout: initialLayout, seatLayoutLoading: true, seatLayoutError: false });
     setLivePoints(fallbackBusPoints(selectedRoute));
     if (selectedRoute.type !== "bus") {
@@ -1905,10 +1915,6 @@ function PortraitSeatChart({ route, selected, setSelected }) {
     return <div className="empty-results">Loading live seat layout...</div>;
   }
 
-  if (route.seatLayout?.isFallback) {
-    return <FallbackSeatChart route={route} selected={selected} setSelected={setSelected} unavailable={unavailable} />;
-  }
-
   const routeTypeText = String(route.classType || route.vehicleType || route.seatLayout?.type || "").toLowerCase();
   const sleeperOnlyRoute = routeTypeText.includes("sleeper") && !/(seat|seater|sitting|mixed)/.test(routeTypeText);
   const apiSeats = extractSeatList(route.seatLayout).map(normalizeApiSeat).filter(Boolean).map((seat) => sleeperOnlyRoute ? {
@@ -1948,32 +1954,6 @@ function PortraitSeatChart({ route, selected, setSelected }) {
           : <DeckPlaceholder title="Upper deck" />}
       </div>
       <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="female-seat">Women</span><span className="sold-seat">Sold</span></div>
-    </div>
-  );
-}
-
-function FallbackSeatChart({ route, selected, setSelected, unavailable }) {
-  const seats = extractSeatList(route.seatLayout).filter((seat) => !seat.isWalkway);
-  const decks = ["lower", "upper"].map((deck) => ({
-    deck,
-    seats: seats.filter((seat) => String(seat.deck || "lower").toLowerCase() === deck)
-  })).filter((group) => group.seats.length);
-  const toggle = (id) => setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
-  return (
-    <div className="fallback-seat-chart">
-      {decks.map((group) => (
-        <article key={group.deck} className="fallback-deck-card">
-          <div className="fallback-deck-head"><h3>{group.deck === "upper" ? "Upper deck" : "Lower deck"}</h3><span>Driver</span></div>
-          <div className="fallback-seat-grid">
-            {group.seats.map((seat) => {
-              const sold = unavailable.has(seat.id);
-              const chosen = selected.includes(seat.id);
-              return <button type="button" key={seat.id} disabled={sold} className={`${seat.isBerth ? "berth" : "chair"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""}`} onClick={() => toggle(seat.id)}><b>{seat.id}</b><small>{sold ? "Sold" : `₹${seatFareAmount(seat, route.price)}`}</small></button>;
-            })}
-          </div>
-        </article>
-      ))}
-      <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="sold-seat">Sold</span></div>
     </div>
   );
 }
