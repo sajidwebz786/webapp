@@ -762,6 +762,18 @@ h1 { font-family: var(--display-font); font-size: 46px; line-height: 1.02; font-
 .booking-tabs { position: sticky; top: 82px; z-index: 13; margin: 0; }
 .dedicated-seat-screen { width: calc(100% - 32px); max-width: 1220px; margin: 18px auto; display: grid; grid-template-columns: minmax(0, 900px) 330px; justify-content: center; gap: 22px; align-items: start; min-width: 0; }
 .portrait-chart-wrap { width: min(100%, 980px); max-width: 980px; justify-self: center; display: grid; grid-template-columns: 1fr; justify-content: center; gap: 12px; align-items: start; min-width: 0; }
+.fallback-seat-chart { width: 100%; display: grid; gap: 14px; min-width: 0; }
+.fallback-deck-card { background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 18px; overflow-x: auto; box-shadow: 0 10px 22px rgba(20,36,65,.08); }
+.fallback-deck-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.fallback-deck-head h3 { margin: 0; text-transform: capitalize; }
+.fallback-deck-head span { border: 1px solid #c5ccdc; border-radius: 999px; padding: 5px 12px; color: #6f7480; font-size: 11px; font-weight: 850; }
+.fallback-seat-grid { display: grid; grid-template-columns: repeat(5, minmax(54px, 1fr)); gap: 12px; min-width: 340px; }
+.fallback-seat-grid button { min-height: 58px; border: 2px solid #0b8d44; border-radius: 9px; background: white; color: #111827; display: grid; place-items: center; align-content: center; gap: 4px; }
+.fallback-seat-grid button.berth { min-height: 76px; border-radius: 12px; }
+.fallback-seat-grid button small { color: #64748b; font-size: 10px; }
+.fallback-seat-grid button.chosen { background: #0b8d44; color: white; }
+.fallback-seat-grid button.chosen small { color: white; }
+.fallback-seat-grid button.sold { border-color: #d1d5db; background: #e5e7eb; color: #9ca3af; }
 .deck-lane { min-width: 0; width: 100%; }
 .deck-card { width: 100%; background: white; border: 1px solid #c5ccdc; border-radius: 16px; padding: 20px 16px; box-shadow: 0 10px 22px rgba(20, 36, 65, .08); min-height: auto; min-width: 0; overflow: hidden; }
 .compact-deck-card { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 14px; align-items: center; min-height: 138px; padding: 14px 18px; border-radius: 12px; box-shadow: none; }

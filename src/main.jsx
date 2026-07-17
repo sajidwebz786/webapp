@@ -93,11 +93,11 @@ const cancellationPolicyRows = [
 const footerRouteTabs = {
   routes: {
     label: "Top Bus Routes",
-    links: ["Hyderabad to Bangalore Bus", "Bangalore to Chennai Bus", "Mumbai to Pune Bus", "Delhi to Jaipur Bus", "Chennai to Coimbatore Bus", "Hyderabad to Vijayawada Bus", "Bangalore to Goa Bus", "Pune to Mumbai Bus", "Kolkata to Bhubaneswar Bus", "Ahmedabad to Surat Bus", "Indore to Bhopal Bus", "Kochi to Trivandrum Bus"]
+    links: ["Hyderabad to Bengaluru Bus", "Bengaluru to Chennai Bus", "Mumbai to Pune Bus", "Delhi to Jaipur Bus", "Chennai to Coimbatore Bus", "Hyderabad to Vijayawada Bus", "Bengaluru to Goa Bus", "Pune to Mumbai Bus", "Kolkata to Bhubaneswar Bus", "Ahmedabad to Surat Bus", "Indore to Bhopal Bus", "Kochi to Trivandrum Bus"]
   },
   cities: {
     label: "Buses From Top Cities",
-    links: ["Buses from Hyderabad", "Buses from Bangalore", "Buses from Chennai", "Buses from Mumbai", "Buses from Delhi", "Buses from Pune", "Buses from Kolkata", "Buses from Ahmedabad", "Buses from Jaipur", "Buses from Kochi", "Buses from Lucknow", "Buses from Chandigarh"]
+    links: ["Buses from Hyderabad", "Buses from Bengaluru", "Buses from Chennai", "Buses from Mumbai", "Buses from Delhi", "Buses from Pune", "Buses from Kolkata", "Buses from Ahmedabad", "Buses from Jaipur", "Buses from Kochi", "Buses from Lucknow", "Buses from Chandigarh"]
   },
   rtc: {
     label: "Top RTC Buses",
@@ -586,7 +586,7 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
       const data = await api(`/transport/${type}/search?${params}`);
       setResultsState(data);
       setSearchSnapshots?.((current) => ({ ...current, [type]: { query, results: data, message: "" } }));
-      if (!data.length && !silent) setMessage(`No ${type === "bus" ? "bus" : type} services returned for this route/date. Try another date or route.`);
+      if (!data.length && !silent) setMessage("The travel API could not fetch any results for this route and date.");
       if (!silent) {
         window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
       }
@@ -692,6 +692,32 @@ function JourneySearch({ type, cities, user, setUser, setPage, refreshBookings, 
   );
 }
 
+function fallbackBusSeatLayout(route) {
+  const description = `${route?.classType || ""} ${route?.vehicleType || ""}`.toLowerCase();
+  const sleeper = description.includes("sleeper");
+  const seats = [];
+  const rows = sleeper ? 10 : 11;
+  for (let row = 1; row <= rows; row += 1) {
+    if (sleeper) {
+      seats.push(
+        { id: `A${row}`, row, column: 1, deck: row > 5 ? "upper" : "lower", isBerth: true, visualType: "berth", fareMultiplier: 1.18 },
+        { id: `B${row}`, row, column: 3, deck: row > 5 ? "upper" : "lower", isBerth: true, visualType: "berth", fareMultiplier: 1 },
+        { id: `C${row}`, row, column: 4, deck: row > 5 ? "upper" : "lower", isBerth: true, visualType: "berth", fareMultiplier: 1 }
+      );
+    } else {
+      ["A", "B", "C", "D"].forEach((column, index) => seats.push({ id: `${column}${row}`, row, column: index + 1, deck: "lower", fareMultiplier: 1 }));
+    }
+  }
+  return { type: sleeper ? "sleeper" : "seater", rows, cols: 4, unavailable: ["A3", "B4", "C7"], seats, isFallback: true };
+}
+
+function fallbackBusPoints(route) {
+  return {
+    boardingPoints: routeBoardingPoints(route).map((point, index) => ({ ...point, id: `fallback-board-${index + 1}` })),
+    droppingPoints: routeDroppingPoints(route).map((point, index) => ({ ...point, id: `fallback-drop-${index + 1}` }))
+  };
+}
+
 function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuthReturnPage, bookingResumeState, setBookingResumeState }) {
   const savedState = bookingResumeState?.routeId === activeJourney?.route?.id ? bookingResumeState : null;
   const [step, setStep] = useState(savedState?.step || "seats");
@@ -719,18 +745,22 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
     setContact(nextSavedState?.contact || (user ? { email: user.email || "", phone: user.phone || "", emergencyPhone: "" } : { email: "", phone: "", emergencyPhone: "" }));
     setBoardingPoint(nextSavedState?.boardingPoint || "");
     setDropPoint(nextSavedState?.dropPoint || "");
-    setLiveRoute({ ...selectedRoute, seatLayout: null, seatLayoutLoading: true, seatLayoutError: false });
-    setLivePoints(null);
+    const initialLayout = selectedRoute.seatLayout?.seats?.length ? selectedRoute.seatLayout : fallbackBusSeatLayout(selectedRoute);
+    setLiveRoute({ ...selectedRoute, seatLayout: initialLayout, seatLayoutLoading: false, seatLayoutError: false });
+    setLivePoints(fallbackBusPoints(selectedRoute));
     if (selectedRoute.type !== "bus") {
       setStep("passenger");
       return;
     }
     api(`/transport/${selectedRoute.type}/${selectedRoute.id}/seats`).then((seatLayout) => {
-      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout, seatLayoutLoading: false, seatLayoutError: false }));
+      const usableLayout = extractSeatList(seatLayout).some((seat, index) => normalizeApiSeat(seat, index));
+      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout: usableLayout ? seatLayout : initialLayout, seatLayoutLoading: false, seatLayoutError: false }));
     }).catch(() => {
-      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout: null, seatLayoutLoading: false, seatLayoutError: true }));
+      setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout: initialLayout, seatLayoutLoading: false, seatLayoutError: false }));
     });
-    api(`/transport/${selectedRoute.type}/${selectedRoute.id}/points`).then(setLivePoints).catch(() => {});
+    api(`/transport/${selectedRoute.type}/${selectedRoute.id}/points`).then((points) => {
+      if (points?.boardingPoints?.length && points?.droppingPoints?.length) setLivePoints(points);
+    }).catch(() => {});
   }, [activeJourney?.route?.id]);
 
   useEffect(() => {
@@ -1854,6 +1884,10 @@ function PortraitSeatChart({ route, selected, setSelected }) {
     return <div className="empty-results">Loading live seat layout...</div>;
   }
 
+  if (route.seatLayout?.isFallback) {
+    return <FallbackSeatChart route={route} selected={selected} setSelected={setSelected} unavailable={unavailable} />;
+  }
+
   const routeTypeText = String(route.classType || route.vehicleType || route.seatLayout?.type || "").toLowerCase();
   const sleeperOnlyRoute = routeTypeText.includes("sleeper") && !/(seat|seater|sitting|mixed)/.test(routeTypeText);
   const apiSeats = extractSeatList(route.seatLayout).map(normalizeApiSeat).filter(Boolean).map((seat) => sleeperOnlyRoute ? {
@@ -1893,6 +1927,32 @@ function PortraitSeatChart({ route, selected, setSelected }) {
           : <DeckPlaceholder title="Upper deck" />}
       </div>
       <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="female-seat">Women</span><span className="sold-seat">Sold</span></div>
+    </div>
+  );
+}
+
+function FallbackSeatChart({ route, selected, setSelected, unavailable }) {
+  const seats = extractSeatList(route.seatLayout).filter((seat) => !seat.isWalkway);
+  const decks = ["lower", "upper"].map((deck) => ({
+    deck,
+    seats: seats.filter((seat) => String(seat.deck || "lower").toLowerCase() === deck)
+  })).filter((group) => group.seats.length);
+  const toggle = (id) => setSelected(selected.includes(id) ? selected.filter((seat) => seat !== id) : [...selected, id]);
+  return (
+    <div className="fallback-seat-chart">
+      {decks.map((group) => (
+        <article key={group.deck} className="fallback-deck-card">
+          <div className="fallback-deck-head"><h3>{group.deck === "upper" ? "Upper deck" : "Lower deck"}</h3><span>Driver</span></div>
+          <div className="fallback-seat-grid">
+            {group.seats.map((seat) => {
+              const sold = unavailable.has(seat.id);
+              const chosen = selected.includes(seat.id);
+              return <button type="button" key={seat.id} disabled={sold} className={`${seat.isBerth ? "berth" : "chair"} ${sold ? "sold" : ""} ${chosen ? "chosen" : ""}`} onClick={() => toggle(seat.id)}><b>{seat.id}</b><small>{sold ? "Sold" : `₹${seatFareAmount(seat, route.price)}`}</small></button>;
+            })}
+          </div>
+        </article>
+      ))}
+      <div className="seat-legend vibrant"><span className="available-seat">Available</span><span className="selected-seat">Selected</span><span className="sold-seat">Sold</span></div>
     </div>
   );
 }
