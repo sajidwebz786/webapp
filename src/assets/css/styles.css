@@ -767,9 +767,9 @@ h1 { font-family: var(--display-font); font-size: 46px; line-height: 1.02; font-
 .fallback-deck-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .fallback-deck-head h3 { margin: 0; text-transform: capitalize; }
 .fallback-deck-head span { border: 1px solid #c5ccdc; border-radius: 999px; padding: 5px 12px; color: #6f7480; font-size: 11px; font-weight: 850; }
-.fallback-seat-grid { display: grid; grid-template-columns: repeat(5, minmax(54px, 1fr)); gap: 12px; min-width: 340px; }
-.fallback-seat-grid button { min-height: 58px; border: 2px solid #0b8d44; border-radius: 9px; background: white; color: #111827; display: grid; place-items: center; align-content: center; gap: 4px; }
-.fallback-seat-grid button.berth { min-height: 76px; border-radius: 12px; }
+.fallback-seat-grid { display: grid; grid-template-columns: repeat(5, 72px); justify-content: center; gap: 12px; min-width: 408px; }
+.fallback-seat-grid button { width: 72px; height: 58px; min-height: 0; border: 2px solid #0b8d44; border-radius: 9px; background: white; color: #111827; display: grid; place-items: center; align-content: center; gap: 4px; }
+.fallback-seat-grid button.berth { width: 72px; height: 76px; min-height: 0; border-radius: 12px; }
 .fallback-seat-grid button small { color: #64748b; font-size: 10px; }
 .fallback-seat-grid button.chosen { background: #0b8d44; color: white; }
 .fallback-seat-grid button.chosen small { color: white; }

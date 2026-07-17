@@ -23,6 +23,13 @@ const services = [
 ];
 
 const initialPassenger = { name: "", age: "", gender: "Male", seat: "" };
+const AUTH_RETURN_KEY = "traveltimes_auth_return";
+const ACTIVE_JOURNEY_KEY = "traveltimes_active_journey";
+const BOOKING_RESUME_KEY = "traveltimes_booking_resume";
+const readSessionValue = (key) => {
+  try { return JSON.parse(sessionStorage.getItem(key) || "null"); } catch { return null; }
+};
+const authReturnDestination = (authReturnPage, pendingCheckout) => authReturnPage || sessionStorage.getItem(AUTH_RETURN_KEY) || (pendingCheckout ? "checkout" : "dashboard");
 const toDateInputValue = (date) => date.toISOString().slice(0, 10);
 const daysFromNow = (days) => {
   const date = new Date();
@@ -341,8 +348,8 @@ function App() {
   const [hotels, setHotels] = useState([]);
   const [pendingRoute, setPendingRoute] = useState(null);
   const [pendingCheckout, setPendingCheckout] = useState(null);
-  const [activeJourney, setActiveJourney] = useState(null);
-  const [bookingResumeState, setBookingResumeState] = useState(null);
+  const [activeJourney, setActiveJourney] = useState(() => readSessionValue(ACTIVE_JOURNEY_KEY));
+  const [bookingResumeState, setBookingResumeState] = useState(() => readSessionValue(BOOKING_RESUME_KEY));
   const [searchSnapshots, setSearchSnapshots] = useState({});
   const [authReturnPage, setAuthReturnPage] = useState(null);
   const [authMessage, setAuthMessage] = useState("");
@@ -367,7 +374,9 @@ function App() {
         const data = await api("/auth/me");
         setUser(data.user);
         window.history.replaceState({}, "", "/");
-        setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
+        const destination = authReturnDestination(authReturnPage, pendingCheckout);
+        setPage(destination);
+        sessionStorage.removeItem(AUTH_RETURN_KEY);
         return;
       }
       if (error) throw new Error(error);
@@ -389,7 +398,9 @@ function App() {
       tokenStore.set(data.token);
       setUser(data.user);
       window.history.replaceState({}, "", "/");
-      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
+      const destination = authReturnDestination(authReturnPage, pendingCheckout);
+      setPage(destination);
+      sessionStorage.removeItem(AUTH_RETURN_KEY);
     };
     finishGoogleLogin().catch((error) => {
       setAuthMessage(error.message || "Google sign-in failed. Please try again.");
@@ -746,21 +757,27 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
     setBoardingPoint(nextSavedState?.boardingPoint || "");
     setDropPoint(nextSavedState?.dropPoint || "");
     const initialLayout = selectedRoute.seatLayout?.seats?.length ? selectedRoute.seatLayout : fallbackBusSeatLayout(selectedRoute);
-    setLiveRoute({ ...selectedRoute, seatLayout: initialLayout, seatLayoutLoading: false, seatLayoutError: false });
+    setLiveRoute({ ...selectedRoute, seatLayout: initialLayout, seatLayoutLoading: true, seatLayoutError: false });
     setLivePoints(fallbackBusPoints(selectedRoute));
     if (selectedRoute.type !== "bus") {
       setStep("passenger");
       return;
     }
-    api(`/transport/${selectedRoute.type}/${selectedRoute.id}/seats`).then((seatLayout) => {
+    const seatRequest = new AbortController();
+    const seatRequestTimeout = window.setTimeout(() => seatRequest.abort(), 5000);
+    api(`/transport/${selectedRoute.type}/${selectedRoute.id}/seats`, { signal: seatRequest.signal }).then((seatLayout) => {
       const usableLayout = extractSeatList(seatLayout).some((seat, index) => normalizeApiSeat(seat, index));
       setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout: usableLayout ? seatLayout : initialLayout, seatLayoutLoading: false, seatLayoutError: false }));
     }).catch(() => {
       setLiveRoute((current) => ({ ...(current || selectedRoute), seatLayout: initialLayout, seatLayoutLoading: false, seatLayoutError: false }));
-    });
+    }).finally(() => window.clearTimeout(seatRequestTimeout));
     api(`/transport/${selectedRoute.type}/${selectedRoute.id}/points`).then((points) => {
       if (points?.boardingPoints?.length && points?.droppingPoints?.length) setLivePoints(points);
     }).catch(() => {});
+    return () => {
+      window.clearTimeout(seatRequestTimeout);
+      seatRequest.abort();
+    };
   }, [activeJourney?.route?.id]);
 
   useEffect(() => {
@@ -802,7 +819,11 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
 
   const goPassenger = () => {
     if (!user) {
-      setBookingResumeState?.({ routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint });
+      const resumeState = { routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint };
+      setBookingResumeState?.(resumeState);
+      sessionStorage.setItem(BOOKING_RESUME_KEY, JSON.stringify(resumeState));
+      sessionStorage.setItem(ACTIVE_JOURNEY_KEY, JSON.stringify(activeJourney));
+      sessionStorage.setItem(AUTH_RETURN_KEY, "booking");
       setAuthReturnPage("booking");
       setPage("auth");
       return;
@@ -830,7 +851,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
         <div className="window-offer">Last min. 10% OFF</div>
       </div>
       <div className="wizard-tabs booking-tabs">
-        {(isBus ? ["seats", "points", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} disabled={(item === "points" || item === "passenger") && !selectedSeats.length} onClick={() => item === "passenger" && !user ? (setBookingResumeState?.({ routeId: route.id, step: "passenger", selectedSeats, passengers, contact, boardingPoint, dropPoint }), setAuthReturnPage("booking"), setPage("auth")) : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
+        {(isBus ? ["seats", "points", "passenger"] : ["passenger"]).map((item, index) => <button key={item} className={step === item ? "active" : ""} disabled={(item === "points" || item === "passenger") && !selectedSeats.length} onClick={() => item === "passenger" && !user ? goPassenger() : setStep(item)}>{index + 1}. {item === "points" ? "Board/Drop point" : item === "seats" ? "Select seats" : "Passenger Info"}</button>)}
       </div>
       {isBus && step === "points" && <BoardDropStep boardingPoints={boardingPoints} droppingPoints={droppingPoints} boardingPoint={boardingPoint} setBoardingPoint={setBoardingPoint} dropPoint={dropPoint} setDropPoint={setDropPoint} />}
       {isBus && step === "seats" && <div className="dedicated-seat-screen"><PortraitSeatChart route={route} selected={selectedSeats} setSelected={setSelectedSeats} /><BusProfilePanel route={route} /></div>}
@@ -2733,6 +2754,12 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
   const [form, setForm] = useState({ name: "", email: "customer@orbitatravels.com", phone: "", password: "customer123" });
   const [resetForm, setResetForm] = useState({ email: "", token: resetTokenFromUrl, password: "" });
   const [message, setMessage] = useState(authMessage || "");
+  const continueAfterAuthentication = () => {
+    const destination = authReturnDestination(authReturnPage, pendingCheckout);
+    setPage(destination);
+    setAuthReturnPage?.(null);
+    sessionStorage.removeItem(AUTH_RETURN_KEY);
+  };
   const returnToFlow = () => {
     if (authReturnPage === "booking" || pendingCheckout?.route?.type === "bus") return setPage("booking");
     if (authReturnPage === "checkout" && pendingCheckout) return setPage("checkout");
@@ -2763,8 +2790,7 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
       });
       tokenStore.set(data.token);
       setUser(data.user);
-      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
-      setAuthReturnPage?.(null);
+      continueAfterAuthentication();
     } catch (error) {
       setMessage(error.message);
     }
@@ -2776,8 +2802,7 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
       const data = await api(`/auth/${mode}`, { method: "POST", body: JSON.stringify(form) });
       tokenStore.set(data.token);
       setUser(data.user);
-      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
-      setAuthReturnPage?.(null);
+      continueAfterAuthentication();
     } catch (error) {
       setMessage(error.message);
     }
@@ -2800,15 +2825,14 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
       tokenStore.set(data.token);
       setUser(data.user);
       window.history.replaceState({}, "", "/");
-      setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard"));
-      setAuthReturnPage?.(null);
+      continueAfterAuthentication();
     } catch (error) {
       setMessage(error.message);
     }
   };
 
   if (user) {
-    return <section className="page-band account-page"><div className="page-heading"><UserRound size={34} /><div><h1>You are logged in</h1><p>Continue to your dashboard or complete the selected booking.</p></div></div><button className="primary" onClick={() => { setPage(authReturnPage || (pendingCheckout ? "checkout" : "dashboard")); setAuthReturnPage?.(null); }}>Continue</button></section>;
+    return <section className="page-band account-page"><div className="page-heading"><UserRound size={34} /><div><h1>You are logged in</h1><p>Continue to your dashboard or complete the selected booking.</p></div></div><button className="primary" onClick={continueAfterAuthentication}>Continue</button></section>;
   }
 
   return (
