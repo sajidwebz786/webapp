@@ -29,7 +29,15 @@ const BOOKING_RESUME_KEY = "traveltimes_booking_resume";
 const readSessionValue = (key) => {
   try { return JSON.parse(sessionStorage.getItem(key) || "null"); } catch { return null; }
 };
-const authReturnDestination = (authReturnPage, pendingCheckout) => authReturnPage || sessionStorage.getItem(AUTH_RETURN_KEY) || (pendingCheckout ? "checkout" : "dashboard");
+const authReturnDestination = (authReturnPage, pendingCheckout) => {
+  const explicitDestination = authReturnPage || sessionStorage.getItem(AUTH_RETURN_KEY);
+  if (explicitDestination) return explicitDestination;
+  if (pendingCheckout) return "checkout";
+  const savedJourney = readSessionValue(ACTIVE_JOURNEY_KEY);
+  const savedBooking = readSessionValue(BOOKING_RESUME_KEY);
+  if (savedJourney?.route?.id && savedBooking?.routeId === savedJourney.route.id) return "booking";
+  return "dashboard";
+};
 const toDateInputValue = (date) => date.toISOString().slice(0, 10);
 const daysFromNow = (days) => {
   const date = new Date();
@@ -355,6 +363,42 @@ function App() {
   const [authMessage, setAuthMessage] = useState("");
 
   const refreshBookings = () => user && api("/bookings/mine").then(setBookings).catch(() => {});
+  const continueAfterAuthentication = () => {
+    const savedJourney = activeJourney || readSessionValue(ACTIVE_JOURNEY_KEY);
+    const savedBooking = bookingResumeState || readSessionValue(BOOKING_RESUME_KEY);
+    const hasBookingFlow = savedJourney?.route?.id
+      && savedBooking?.routeId != null
+      && String(savedBooking.routeId) === String(savedJourney.route.id);
+    if (hasBookingFlow) {
+      setActiveJourney(savedJourney);
+      setBookingResumeState({ ...savedBooking, step: "passenger" });
+      sessionStorage.setItem(BOOKING_RESUME_KEY, JSON.stringify({ ...savedBooking, step: "passenger" }));
+      setPage("booking");
+    } else {
+      setPage(pendingCheckout ? "checkout" : "dashboard");
+    }
+    setAuthReturnPage(null);
+    sessionStorage.removeItem(AUTH_RETURN_KEY);
+  };
+  const recoverableJourney = activeJourney || readSessionValue(ACTIVE_JOURNEY_KEY);
+  const recoverableBooking = bookingResumeState || readSessionValue(BOOKING_RESUME_KEY);
+  const canContinueBooking = Boolean(
+    recoverableJourney?.route?.id
+    && recoverableBooking?.routeId != null
+    && String(recoverableJourney.route.id) === String(recoverableBooking.routeId)
+    && recoverableBooking.selectedSeats?.length
+    && recoverableBooking.boardingPoint
+    && recoverableBooking.dropPoint
+  );
+  const continueSavedBooking = () => {
+    if (!canContinueBooking) return;
+    const restoredBooking = { ...recoverableBooking, step: "passenger" };
+    setActiveJourney(recoverableJourney);
+    setBookingResumeState(restoredBooking);
+    sessionStorage.setItem(ACTIVE_JOURNEY_KEY, JSON.stringify(recoverableJourney));
+    sessionStorage.setItem(BOOKING_RESUME_KEY, JSON.stringify(restoredBooking));
+    setPage("booking");
+  };
 
   useEffect(() => {
     api("/catalog/cities").then(setCities);
@@ -374,9 +418,7 @@ function App() {
         const data = await api("/auth/me");
         setUser(data.user);
         window.history.replaceState({}, "", "/");
-        const destination = authReturnDestination(authReturnPage, pendingCheckout);
-        setPage(destination);
-        sessionStorage.removeItem(AUTH_RETURN_KEY);
+        continueAfterAuthentication();
         return;
       }
       if (error) throw new Error(error);
@@ -398,9 +440,7 @@ function App() {
       tokenStore.set(data.token);
       setUser(data.user);
       window.history.replaceState({}, "", "/");
-      const destination = authReturnDestination(authReturnPage, pendingCheckout);
-      setPage(destination);
-      sessionStorage.removeItem(AUTH_RETURN_KEY);
+      continueAfterAuthentication();
     };
     finishGoogleLogin().catch((error) => {
       setAuthMessage(error.message || "Google sign-in failed. Please try again.");
@@ -420,9 +460,9 @@ function App() {
       {page === "train" && <ServicePage type="train" cities={cities} user={user} setUser={setUser} setPage={setPage} refreshBookings={refreshBookings} setPendingCheckout={setPendingCheckout} setActiveJourney={setActiveJourney} searchSnapshots={searchSnapshots} setSearchSnapshots={setSearchSnapshots} />}
       {page === "hotels" && <HotelsPage hotels={hotels} setPage={setPage} setPendingCheckout={setPendingCheckout} />}
       {page === "packages" && <PackagesPage packages={packages} user={user} refreshBookings={refreshBookings} />}
-      {page === "dashboard" && <DashboardPage user={user} setUser={setUser} setPage={setPage} bookings={bookings} refreshBookings={refreshBookings} />}
+      {page === "dashboard" && <DashboardPage user={user} setUser={setUser} setPage={setPage} bookings={bookings} refreshBookings={refreshBookings} canContinueBooking={canContinueBooking} recoverableJourney={recoverableJourney} recoverableBooking={recoverableBooking} onContinueBooking={continueSavedBooking} />}
       {page === "support" && <SupportPage user={user} bookings={bookings} />}
-      {page === "auth" && <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={pendingCheckout} authReturnPage={authReturnPage} setAuthReturnPage={setAuthReturnPage} authMessage={authMessage} />}
+      {page === "auth" && <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={pendingCheckout} authReturnPage={authReturnPage} authMessage={authMessage} onAuthenticated={continueAfterAuthentication} />}
       {page === "booking" && <BookingPage activeJourney={activeJourney} setPage={setPage} user={user} setPendingCheckout={setPendingCheckout} setAuthReturnPage={setAuthReturnPage} bookingResumeState={bookingResumeState} setBookingResumeState={setBookingResumeState} />}
       {page === "checkout" && <CheckoutPage user={user} setPage={setPage} pendingCheckout={pendingCheckout} setPendingCheckout={setPendingCheckout} refreshBookings={refreshBookings} />}
       {!immersiveBooking && <FloatingAssistant user={user} bookings={bookings} />}
@@ -792,7 +832,7 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
 
   useEffect(() => {
     if (!activeJourney?.route?.id) return;
-    setBookingResumeState?.({
+    const resumeState = {
       routeId: activeJourney.route.id,
       step,
       selectedSeats,
@@ -800,7 +840,10 @@ function BookingPage({ activeJourney, setPage, user, setPendingCheckout, setAuth
       contact,
       boardingPoint,
       dropPoint
-    });
+    };
+    setBookingResumeState?.(resumeState);
+    sessionStorage.setItem(ACTIVE_JOURNEY_KEY, JSON.stringify(activeJourney));
+    sessionStorage.setItem(BOOKING_RESUME_KEY, JSON.stringify(resumeState));
   }, [activeJourney?.route?.id, step, selectedSeats, passengers, contact, boardingPoint, dropPoint]);
 
   if (!activeJourney) {
@@ -2728,18 +2771,12 @@ function PackagesPage({ packages }) {
   );
 }
 
-function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, setAuthReturnPage, authMessage }) {
+function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, authMessage, onAuthenticated }) {
   const resetTokenFromUrl = new URLSearchParams(window.location.search).get("resetToken") || "";
   const [mode, setMode] = useState(resetTokenFromUrl ? "reset" : "login");
   const [form, setForm] = useState({ name: "", email: "customer@orbitatravels.com", phone: "", password: "customer123" });
   const [resetForm, setResetForm] = useState({ email: "", token: resetTokenFromUrl, password: "" });
   const [message, setMessage] = useState(authMessage || "");
-  const continueAfterAuthentication = () => {
-    const destination = authReturnDestination(authReturnPage, pendingCheckout);
-    setPage(destination);
-    setAuthReturnPage?.(null);
-    sessionStorage.removeItem(AUTH_RETURN_KEY);
-  };
   const returnToFlow = () => {
     if (authReturnPage === "booking" || pendingCheckout?.route?.type === "bus") return setPage("booking");
     if (authReturnPage === "checkout" && pendingCheckout) return setPage("checkout");
@@ -2770,7 +2807,7 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
       });
       tokenStore.set(data.token);
       setUser(data.user);
-      continueAfterAuthentication();
+      onAuthenticated();
     } catch (error) {
       setMessage(error.message);
     }
@@ -2782,7 +2819,7 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
       const data = await api(`/auth/${mode}`, { method: "POST", body: JSON.stringify(form) });
       tokenStore.set(data.token);
       setUser(data.user);
-      continueAfterAuthentication();
+      onAuthenticated();
     } catch (error) {
       setMessage(error.message);
     }
@@ -2805,14 +2842,14 @@ function AuthPage({ user, setUser, setPage, pendingCheckout, authReturnPage, set
       tokenStore.set(data.token);
       setUser(data.user);
       window.history.replaceState({}, "", "/");
-      continueAfterAuthentication();
+      onAuthenticated();
     } catch (error) {
       setMessage(error.message);
     }
   };
 
   if (user) {
-    return <section className="page-band account-page"><div className="page-heading"><UserRound size={34} /><div><h1>You are logged in</h1><p>Continue to your dashboard or complete the selected booking.</p></div></div><button className="primary" onClick={continueAfterAuthentication}>Continue</button></section>;
+    return <section className="page-band account-page"><div className="page-heading"><UserRound size={34} /><div><h1>You are logged in</h1><p>Continue to your dashboard or complete the selected booking.</p></div></div><button className="primary" onClick={onAuthenticated}>Continue</button></section>;
   }
 
   return (
@@ -3026,7 +3063,7 @@ function CheckoutPage({ user, setPage, pendingCheckout, setPendingCheckout, refr
   );
 }
 
-function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
+function DashboardPage({ user, setUser, setPage, bookings, refreshBookings, canContinueBooking, recoverableJourney, recoverableBooking, onContinueBooking }) {
   if (!user) return <AuthPage user={user} setUser={setUser} setPage={setPage} pendingCheckout={null} />;
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [profileForm, setProfileForm] = useState({ name: user.name || "", phone: user.phone || "" });
@@ -3083,6 +3120,15 @@ function DashboardPage({ user, setUser, setPage, bookings, refreshBookings }) {
   return (
     <section className="page-band dashboard-page">
       <div className="page-heading"><UserRound size={34} /><div><h1>{user.name}'s Dashboard</h1><p>Manage bookings, rewards, support and journey tracking.</p></div></div>
+      {canContinueBooking && <article className="continue-booking-card">
+        <div>
+          <span>Booking in progress</span>
+          <h2>{recoverableJourney.route.origin} → {recoverableJourney.route.destination}</h2>
+          <p>{recoverableJourney.route.providerName} · Seats {recoverableBooking.selectedSeats.join(", ")}</p>
+          <small>Boarding: {recoverableBooking.boardingPoint} · Dropping: {recoverableBooking.dropPoint}</small>
+        </div>
+        <button type="button" onClick={onContinueBooking}>Continue Booking <ChevronRight size={18} /></button>
+      </article>}
       <div className="customer-metrics">
         <article><CalendarDays /><span>Total bookings</span><strong>{bookings.length}</strong></article>
         <article><Gift /><span>Reward points</span><strong>{rewardPoints.toLocaleString("en-IN")}</strong></article>

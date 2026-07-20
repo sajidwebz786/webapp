@@ -984,6 +984,13 @@ h1 { font-family: var(--display-font); font-size: 46px; line-height: 1.02; font-
 .account-page > .primary { align-self: center; min-width: 220px; }
 .dashboard-page .page-heading, .dashboard-page .customer-metrics, .dashboard-page .dashboard-grid { width: min(1180px, 100%); margin-left: auto; margin-right: auto; }
 .dashboard-page .page-heading { margin-bottom: 26px; }
+.continue-booking-card { width: min(1180px, 100%); margin: -8px auto 22px; padding: 20px 22px; border: 1px solid rgba(227,27,55,.25); border-radius: 16px; background: linear-gradient(135deg, #fff5f6, #ffffff); box-shadow: 0 12px 28px rgba(20,36,65,.1); display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.continue-booking-card span { color: var(--red); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+.continue-booking-card h2 { margin: 5px 0; font-size: 24px; }
+.continue-booking-card p { margin: 0 0 5px; color: var(--ink); font-weight: 750; }
+.continue-booking-card small { color: var(--muted); }
+.continue-booking-card button { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 13px 18px; background: var(--red); color: white; display: inline-flex; align-items: center; gap: 7px; font-weight: 900; text-transform: uppercase; }
+.continue-booking-card button:hover { background: var(--red-dark); }
 .forgot-link, .link-button { border: 0; background: transparent; color: var(--blue); font-weight: 800; justify-self: end; padding: 4px 0; }
 .link-button { justify-self: start; }
 .forgot-link:hover, .link-button:hover { color: var(--red); }
@@ -1167,6 +1174,8 @@ h1 { font-family: var(--display-font); font-size: 46px; line-height: 1.02; font-
   .utility-nav { grid-template-columns: 1fr; gap: 10px; padding-bottom: 8px; }
   .utility-nav button { min-height: 48px; border: 1px solid #e2e8f0; border-radius: 14px; background: white; justify-content: flex-start; padding: 0 14px; }
   .main-search-row, .card-grid, .offer-row, .news-row, .operator-row, .testimonial-row, .dashboard-grid, .customer-metrics, .passenger-grid, .contact-grid, .inline-login, .journey-results, .mini-offers, .point-grid, .seat-info-layout, .ticket-grid, .ticket-passenger, .dedicated-seat-screen, .passenger-screen, .footer-link-columns, .footer-bottom-bar, .service-story-grid, .service-info-band, .catalog-feature-row { grid-template-columns: 1fr; }
+  .continue-booking-card { align-items: stretch; flex-direction: column; }
+  .continue-booking-card button { justify-content: center; }
   .abhi-search-bar { flex-direction: column; border-radius: 20px; gap: 12px; padding: 12px; background: #f8fafc; border-color: #e3e9f2; overflow: visible; box-shadow: 0 16px 34px rgba(20,36,65,.12); }
   .abhi-search-bar:hover { transform: none; }
   .abhi-field { min-height: 76px; border: 1px solid #dfe6ef; border-radius: 16px; padding: 14px 16px; background: white; }
